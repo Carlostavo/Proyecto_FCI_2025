@@ -1,6 +1,6 @@
 "use client"
 
-import { useActionState, useState } from "react"
+import { useActionState, useState, useEffect } from "react"
 import { Link2, Mail, Phone, User, FileText, ImageIcon, Bell, BellOff, Loader2 } from "lucide-react"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
@@ -54,7 +54,26 @@ export function PerfilForm({
     const res = await actualizarNotificaciones(value)
     setNotifPending(false)
     setNotifMsg(res?.message ?? null)
+    // Sincronizar cambios al header
+    syncToHeader({ notificaciones_activas: value })
   }
+
+  function syncToHeader(data: Record<string, unknown>) {
+    if (typeof window !== "undefined") {
+      localStorage.setItem("perfil_sync", JSON.stringify(data))
+      window.dispatchEvent(new Event("perfil:updated"))
+    }
+  }
+
+  // Sincronizar al header cuando se guardan los cambios del perfil
+  useEffect(() => {
+    if (state?.ok) {
+      syncToHeader({
+        nombre: nombre,
+        avatar_url: avatar,
+      })
+    }
+  }, [state?.ok])
 
   return (
     <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">

@@ -46,20 +46,25 @@ ALTER TABLE public.perfiles_usuario ENABLE ROW LEVEL SECURITY;
 -- Perfiles: cada usuario gestiona su propio perfil
 DROP POLICY IF EXISTS "perfiles_select_propio" ON public.perfiles_usuario;
 CREATE POLICY "perfiles_select_propio" ON public.perfiles_usuario
-  FOR SELECT USING (auth.uid() = id);
+  FOR SELECT
+  USING (id = auth.uid());
 
 DROP POLICY IF EXISTS "perfiles_insert_propio" ON public.perfiles_usuario;
 CREATE POLICY "perfiles_insert_propio" ON public.perfiles_usuario
-  FOR INSERT WITH CHECK (auth.uid() = id);
+  FOR INSERT
+  WITH CHECK (id = auth.uid());
 
 DROP POLICY IF EXISTS "perfiles_update_propio" ON public.perfiles_usuario;
 CREATE POLICY "perfiles_update_propio" ON public.perfiles_usuario
-  FOR UPDATE USING (auth.uid() = id);
+  FOR UPDATE
+  USING (id = auth.uid())
+  WITH CHECK (id = auth.uid());
 
 -- Roles: cada usuario puede leer su propio rol
 DROP POLICY IF EXISTS "roles_select_propio" ON public.roles_usuario;
 CREATE POLICY "roles_select_propio" ON public.roles_usuario
-  FOR SELECT USING (auth.uid() = id_usuario);
+  FOR SELECT
+  USING (id_usuario = auth.uid());
 
 -- 6. Trigger: crear perfil automáticamente al registrarse
 CREATE OR REPLACE FUNCTION public.handle_new_user()

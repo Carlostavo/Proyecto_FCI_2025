@@ -35,7 +35,7 @@ const SECCIONES = [
   { value: "periodos", label: "Periodos de evaluación", icon: CalendarRange },
 ] as const
 
-export function ConfiguracionTabs() {
+export function ConfiguracionTabs({ usuarios = [] }: { usuarios?: Array<{ id: string; nombre_completo: string | null; email: string | null; rol: string; activa: boolean }> } = {}) {
   return (
     <Tabs defaultValue="usuarios" className="gap-6">
       <TabsList className="flex h-auto w-full flex-wrap justify-start gap-2 bg-transparent p-0">
@@ -52,7 +52,7 @@ export function ConfiguracionTabs() {
       </TabsList>
 
       <TabsContent value="usuarios">
-        <GestionUsuarios />
+        <GestionUsuarios usuarios={usuarios} />
       </TabsContent>
       <TabsContent value="roles">
         <RolesPermisos />
@@ -97,21 +97,16 @@ const ROL_BADGE: Record<string, string> = {
   Investigadora: "bg-chart-4/15 text-chart-4",
   Formadora: "bg-chart-3/15 text-chart-3",
   "Mujer emprendedora": "bg-secondary text-secondary-foreground",
+  "Institución aliada": "bg-chart-2/15 text-chart-2",
+  "Sin rol": "bg-secondary text-secondary-foreground",
 }
 
-const USUARIOS = [
-  { nombre: "María Pérez Quishpe", email: "maria.perez@ug.edu.ec", rol: "Administradora", activa: true },
-  { nombre: "Lucía Andrade Tello", email: "lucia.andrade@ug.edu.ec", rol: "Investigadora", activa: true },
-  { nombre: "Sofía Caisaguano", email: "sofia.c@ug.edu.ec", rol: "Formadora", activa: true },
-  { nombre: "Rosa Maldonado", email: "rosa.m@ejemplo.com", rol: "Mujer emprendedora", activa: false },
-]
-
-function GestionUsuarios() {
+function GestionUsuarios({ usuarios }: { usuarios: Array<{ id: string; nombre_completo: string | null; email: string | null; rol: string; activa: boolean }> }) {
   const [query, setQuery] = useState("")
-  const filtrados = USUARIOS.filter(
+  const filtrados = usuarios.filter(
     (u) =>
-      u.nombre.toLowerCase().includes(query.toLowerCase()) ||
-      u.email.toLowerCase().includes(query.toLowerCase()),
+      (u.nombre_completo?.toLowerCase() ?? "").includes(query.toLowerCase()) ||
+      (u.email?.toLowerCase() ?? "").includes(query.toLowerCase()),
   )
 
   return (
@@ -147,9 +142,9 @@ function GestionUsuarios() {
           </TableHeader>
           <TableBody>
             {filtrados.map((u) => (
-              <TableRow key={u.email}>
-                <TableCell className="font-medium text-foreground">{u.nombre}</TableCell>
-                <TableCell className="text-muted-foreground">{u.email}</TableCell>
+              <TableRow key={u.id}>
+                <TableCell className="font-medium text-foreground">{u.nombre_completo ?? "—"}</TableCell>
+                <TableCell className="text-muted-foreground">{u.email ?? "—"}</TableCell>
                 <TableCell>
                   <span
                     className={cn(
@@ -168,7 +163,7 @@ function GestionUsuarios() {
                 <TableCell className="text-right">
                   <Button variant="ghost" size="sm">
                     <Pencil className="h-4 w-4" />
-                    <span className="sr-only">Editar {u.nombre}</span>
+                    <span className="sr-only">Editar {u.nombre_completo}</span>
                   </Button>
                 </TableCell>
               </TableRow>
