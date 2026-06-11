@@ -166,9 +166,7 @@ export async function crearUsuario(
       return { ok: false, message: "Error al verificar permisos de administrador." }
     }
     
-    // Verificar que el rol sea 'administradora' (minúsculas como en la BD)
     if (perfil.rol !== 'administradora') {
-      console.warn(`Intento de crear usuario por usuario no administrador. Rol: ${perfil.rol}`)
       return { 
         ok: false, 
         message: "User not allowed: Solo las usuarias con rol Administradora pueden crear nuevos usuarios." 
@@ -186,11 +184,7 @@ export async function crearUsuario(
     
     // 4. Usar ADMIN CLIENT para crear usuario
     const supabaseAdmin = createAdminClient()
-    
-    // Generar contraseña temporal segura
     const tempPassword = generarContraseñaTemporal()
-    
-    // Normalizar el rol a minúsculas para la BD
     const rolNormalizado = ROLES_INVERSO[rol] || rol.toLowerCase().replace(/\s+/g, '_')
     
     const { data: authData, error: createError } = await supabaseAdmin.auth.admin.createUser({
@@ -206,7 +200,6 @@ export async function crearUsuario(
     if (createError) {
       console.error("Error al crear usuario en auth:", createError)
       
-      // Manejar errores específicos
       if (createError.message.includes("already registered")) {
         return { ok: false, message: "Este correo electrónico ya está registrado." }
       }
@@ -224,29 +217,51 @@ export async function crearUsuario(
     
     const newUserId = authData.user.id
     
-    // 5. Crear perfil en la tabla perfiles_usuario
-    const { error: profileError } = await supabaseAdmin
+    // 5. ACTUALIZAR el perfil existente (creado por el trigger) en lugar de insertar
+    const { error: updateError } = await supabaseAdmin
       .from("perfiles_usuario")
-      .insert({
-        id: newUserId,
+      .update({
         nombre_completo: nombreCompleto.trim(),
         email: email.trim().toLowerCase(),
         rol: rolNormalizado,
         cuenta_activa: true,
-        fecha_registro: new Date().toISOString(),
         notificaciones_activas: true,
+        fecha_actualizacion: new Date().toISOString(),
       })
+      .eq("id", newUserId)
     
-    if (profileError) {
-      console.error("Error al crear perfil:", profileError)
-      // El usuario ya existe en auth, pero el perfil falló
-      return { 
-        ok: false, 
-        message: `Usuario creado pero hubo un error al configurar su perfil: ${profileError.message}. Por favor, contacta a soporte.` 
+    if (updateError) {
+      console.error("Error al actualizar perfil:", updateError)
+      
+      // Si el perfil no existe (por si acaso), entonces insertamos
+      if (updateError.message.includes("does not exist") || updateError.message.includes("no rows")) {
+        const { error: insertError } = await supabaseAdmin
+          .from("perfiles_usuario")
+          .insert({
+            id: newUserId,
+            nombre_completo: nombreCompleto.trim(),
+            email: email.trim().toLowerCase(),
+            rol: rolNormalizado,
+            cuenta_activa: true,
+            notificaciones_activas: true,
+            fecha_registro: new Date().toISOString(),
+            fecha_actualizacion: new Date().toISOString(),
+          })
+        
+        if (insertError) {
+          return { 
+            ok: false, 
+            message: `Error al crear perfil: ${insertError.message}` 
+          }
+        }
+      } else {
+        return { 
+          ok: false, 
+          message: `Error al configurar perfil: ${updateError.message}` 
+        }
       }
     }
     
-    // 6. Revalidar la página para mostrar el nuevo usuario
     revalidatePath("/configuracion")
     
     return { 
