@@ -97,6 +97,33 @@ export async function getPerfilContext(): Promise<PerfilContext> {
   }
 }
 
+/** Obtiene el rol en minúsculas del usuario actual (para comparaciones) */
+export async function getRolActual(): Promise<string | null> {
+  // En desarrollo sin Supabase, permitir override via localStorage para testing
+  if (!isSupabaseConfigured()) {
+    if (typeof window !== "undefined") {
+      const overrideRol = localStorage.getItem("dev_rol_override")
+      if (overrideRol) return overrideRol
+    }
+    return null
+  }
+
+  const supabase = await createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  if (!user) return null
+
+  const { data: rolData } = await supabase
+    .from("roles_usuario")
+    .select("rol")
+    .eq("id_usuario", user.id)
+    .maybeSingle()
+
+  return rolData?.rol ?? null
+}
+
 /** Notificaciones de ejemplo. Reemplazar por una tabla real cuando exista. */
 export function getNotificacionesDemo(): Notificacion[] {
   return [

@@ -105,32 +105,146 @@ export async function obtenerUsuarios(): Promise<Usuario[]> {
   }
 }
 
+export async function crearUsuario(
+  email: string,
+  nombreCompleto: string,
+  rol: string,
+): Promise<{ ok: boolean; message: string; userId?: string }> {
+  try {
+    const supabase = await createClient()
+
+    const {
+      data: { user: currentUser },
+    } = await supabase.auth.getUser()
+
+    if (!currentUser) return { ok: false, message: "No autenticado." }
+
+    // Crear usuario en Auth
+    const { data: authData, error: authError } = await supabase.auth.admin.createUser({
+      email,
+      password: Math.random().toString(36).slice(-12), // Contraseña temporal
+      email_confirm: true,
+    })
+
+    if (authError || !authData.user) {
+      return { ok: false, message: authError?.message ?? "Error al crear usuario." }
+    }
+
+    const newUserId = authData.user.id
+
+    // Crear perfil
+    const { error: profileError } = await supabase
+      .from("perfiles_usuario")
+      .insert({
+        id: newUserId,
+        nombre_completo: nombreCompleto,
+        email,
+        cuenta_activa: true,
+      })
+
+    if (profileError) {
+      return { ok: false, message: profileError.message }
+    }
+
+    // Asignar rol
+    const { error: roleError } = await supabase
+      .from("roles_usuario")
+      .insert({
+        id_usuario: newUserId,
+        rol,
+      })
+
+    if (roleError) {
+      return { ok: false, message: roleError.message }
+    }
+
+    return { ok: true, message: "Usuario creado exitosamente.", userId: newUserId }
+  } catch (error) {
+    console.error("[v0] Error en crearUsuario:", error)
+    return { ok: false, message: String(error) }
+  }
+}
+
 export async function actualizarUsuario(
   userId: string,
   data: Partial<Usuario>,
 ): Promise<{ ok: boolean; message: string }> {
-  const supabase = await createClient()
+  try {
+    const supabase = await createClient()
 
-  const {
-    data: { user: currentUser },
-  } = await supabase.auth.getUser()
+    const {
+      data: { user: currentUser },
+    } = await supabase.auth.getUser()
 
-  if (!currentUser) return { ok: false, message: "No autenticado." }
+    if (!currentUser) return { ok: false, message: "No autenticado." }
 
-  const { error } = await supabase
-    .from("perfiles_usuario")
-    .update({
-      nombre_completo: data.nombre_completo,
-      email: data.email,
-      telefono: data.telefono,
-      breve_descripcion: data.breve_descripcion,
-      linkedin: data.linkedin,
-      avatar_url: data.avatar_url,
-      cuenta_activa: data.activa,
-      fecha_actualizacion: new Date().toISOString(),
-    })
-    .eq("id", userId)
+    // Actualizar perfil
+    const { error: profileError } = await supabase
+      .from("perfiles_usuario")
+      .update({
+        nombre_completo: data.nombre_completo,
+        email: data.email,
+        telefono: data.telefono,
+        breve_descripcion: data.breve_descripcion,
+        linkedin: data.linkedin,
+        avatar_url: data.avatar_url,
+        cuenta_activa: data.activa,
+        fecha_actualizacion: new Date().toISOString(),
+      })
+      .eq("id", userId)
 
-  if (error) return { ok: false, message: error.message }
-  return { ok: true, message: "Usuario actualizado." }
+    if (profileError) return { ok: false, message: profileError.message }
+
+    // Actualizar rol si se proporciona
+    if (data.rol) {
+      const rolDbValue = data.rol.toLowerCase().replace(/\s+/g, "_")
+      const { error: roleError } = await supabase
+        .from("roles_usuario")
+        .update({ rol: rolDbValue })
+        .eq("id_usuario", userId)
+
+      if (roleError) return { ok: false, message: roleError.message }
+    }
+
+    return { ok: true, message: "Usuario actualizado." }
+  } catch (error) {
+    console.error("[v0] Error en actualizarUsuario:", error)
+    return { ok: false, message: String(error) }
+  }
+}
+
+export async function eliminarUsuario(userId: string): Promise<{ ok: boolean; message: string }> {
+  try {
+    const supabase = await createClient()
+
+    const {
+      data: { user: currentUser },
+    } = await supabase.auth.getUser()
+
+    if (!currentUser) return { ok: false, message: "No autenticado." }
+
+    // Eliminar rol
+    const { error: roleError } = await supabase
+      .from("roles_usuario")
+      .delete()
+      .eq("id_usuario", userId)
+
+    if (roleError) return { ok: false, message: roleError.message }
+
+    // Desactivar perfil (no eliminar para mantener historial)
+    const { error: profileError } = await supabase
+      .from("perfiles_usuario")
+      .update({
+        cuenta_activa: false,
+        fecha_actualizacion: new Date().toISOString(),
+      })
+      .eq("id", userId)
+
+    if (profileError) return { ok: false, message: profileError.message }
+
+    return { ok: true, message: "Usuario eliminado." }
+  } catch (error) {
+    console.error("[v0] Error en eliminarUsuario:", error)
+    return { ok: false, message: String(error) }
+  }
 }

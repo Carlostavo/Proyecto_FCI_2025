@@ -11,6 +11,8 @@ import {
   Check,
   X,
   Pencil,
+  Trash2,
+  Loader2,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -26,7 +28,16 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 import { cn } from "@/lib/utils"
+import { crearUsuario, actualizarUsuario, eliminarUsuario } from "@/lib/usuarios-actions"
 
 const SECCIONES = [
   { value: "usuarios", label: "Gestión de usuarios", icon: Users },
@@ -35,7 +46,13 @@ const SECCIONES = [
   { value: "periodos", label: "Periodos de evaluación", icon: CalendarRange },
 ] as const
 
-export function ConfiguracionTabs({ usuarios = [] }: { usuarios?: Array<{ id: string; nombre_completo: string | null; email: string | null; rol: string; activa: boolean }> } = {}) {
+export function ConfiguracionTabs({ 
+  usuarios = [], 
+  esAdmin = false 
+}: { 
+  usuarios?: Array<{ id: string; nombre_completo: string | null; email: string | null; rol: string; activa: boolean }> 
+  esAdmin?: boolean
+} = {}) {
   return (
     <Tabs defaultValue="usuarios" className="gap-6">
       <TabsList className="flex h-auto w-full flex-wrap justify-start gap-2 bg-transparent p-0">
@@ -52,7 +69,7 @@ export function ConfiguracionTabs({ usuarios = [] }: { usuarios?: Array<{ id: st
       </TabsList>
 
       <TabsContent value="usuarios">
-        <GestionUsuarios usuarios={usuarios} />
+        <GestionUsuarios usuarios={usuarios} esAdmin={esAdmin} />
       </TabsContent>
       <TabsContent value="roles">
         <RolesPermisos />
@@ -101,84 +118,293 @@ const ROL_BADGE: Record<string, string> = {
   "Sin rol": "bg-secondary text-secondary-foreground",
 }
 
-function GestionUsuarios({ usuarios }: { usuarios: Array<{ id: string; nombre_completo: string | null; email: string | null; rol: string; activa: boolean }> }) {
+function GestionUsuarios({ usuarios, esAdmin }: { usuarios: Array<{ id: string; nombre_completo: string | null; email: string | null; rol: string; activa: boolean }>; esAdmin: boolean }) {
   const [query, setQuery] = useState("")
+  const [openCreate, setOpenCreate] = useState(false)
+  const [openEdit, setOpenEdit] = useState(false)
+  const [selectedUser, setSelectedUser] = useState<typeof usuarios[0] | null>(null)
+  const [newEmail, setNewEmail] = useState("")
+  const [newNombre, setNewNombre] = useState("")
+  const [newRol, setNewRol] = useState("investigadora")
+  const [loading, setLoading] = useState(false)
+  const [editNombre, setEditNombre] = useState("")
+  const [editEmail, setEditEmail] = useState("")
+  const [editRol, setEditRol] = useState("")
+  const [editActiva, setEditActiva] = useState(true)
+
   const filtrados = usuarios.filter(
     (u) =>
       (u.nombre_completo?.toLowerCase() ?? "").includes(query.toLowerCase()) ||
       (u.email?.toLowerCase() ?? "").includes(query.toLowerCase()),
   )
 
+  async function handleCreateUser() {
+    if (!newEmail || !newNombre) return
+    setLoading(true)
+    const res = await crearUsuario(newEmail, newNombre, newRol)
+    setLoading(false)
+    if (res.ok) {
+      setOpenCreate(false)
+      setNewEmail("")
+      setNewNombre("")
+      setNewRol("investigadora")
+      window.location.reload() // Refrescar lista
+    } else {
+      alert(`Error: ${res.message}`)
+    }
+  }
+
+  async function handleUpdateUser() {
+    if (!selectedUser) return
+    setLoading(true)
+    const res = await actualizarUsuario(selectedUser.id, {
+      nombre_completo: editNombre,
+      email: editEmail,
+      rol: editRol,
+      activa: editActiva,
+    })
+    setLoading(false)
+    if (res.ok) {
+      setOpenEdit(false)
+      window.location.reload() // Refrescar lista
+    } else {
+      alert(`Error: ${res.message}`)
+    }
+  }
+
+  async function handleDeleteUser(userId: string) {
+    if (!confirm("¿Eliminar este usuario?")) return
+    setLoading(true)
+    const res = await eliminarUsuario(userId)
+    setLoading(false)
+    if (res.ok) {
+      window.location.reload()
+    } else {
+      alert(`Error: ${res.message}`)
+    }
+  }
+
+  function openEditDialog(user: typeof usuarios[0]) {
+    setSelectedUser(user)
+    setEditNombre(user.nombre_completo ?? "")
+    setEditEmail(user.email ?? "")
+    setEditRol(user.rol)
+    setEditActiva(user.activa)
+    setOpenEdit(true)
+  }
+
+  if (!esAdmin) {
+    return (
+      <Panel
+        title="Gestión de usuarios"
+        description="Solo los administradores pueden gestionar usuarios"
+      >
+        <p className="text-muted-foreground">No tienes permiso para gestionar usuarios.</p>
+      </Panel>
+    )
+  }
+
   return (
-    <Panel
-      title="Gestión de usuarios"
-      description="Administra las personas con acceso a la plataforma"
-      action={
-        <Button size="sm">
-          <Plus className="mr-1.5 h-4 w-4" />
-          Nuevo usuario
-        </Button>
-      }
-    >
-      <div className="relative mb-4 max-w-sm">
-        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-        <Input
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="Buscar por nombre o correo…"
-          className="pl-9"
-        />
-      </div>
-      <div className="overflow-x-auto rounded-md border border-border">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Nombre</TableHead>
-              <TableHead>Correo</TableHead>
-              <TableHead>Rol</TableHead>
-              <TableHead>Estado</TableHead>
-              <TableHead className="text-right">Acciones</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {filtrados.map((u) => (
-              <TableRow key={u.id}>
-                <TableCell className="font-medium text-foreground">{u.nombre_completo ?? "—"}</TableCell>
-                <TableCell className="text-muted-foreground">{u.email ?? "—"}</TableCell>
-                <TableCell>
-                  <span
-                    className={cn(
-                      "rounded-full px-2.5 py-0.5 text-xs font-medium",
-                      ROL_BADGE[u.rol] ?? "bg-secondary text-secondary-foreground",
-                    )}
-                  >
-                    {u.rol}
-                  </span>
-                </TableCell>
-                <TableCell>
-                  <Badge variant={u.activa ? "default" : "secondary"}>
-                    {u.activa ? "Activa" : "Inactiva"}
-                  </Badge>
-                </TableCell>
-                <TableCell className="text-right">
-                  <Button variant="ghost" size="sm">
-                    <Pencil className="h-4 w-4" />
-                    <span className="sr-only">Editar {u.nombre_completo}</span>
-                  </Button>
-                </TableCell>
-              </TableRow>
-            ))}
-            {filtrados.length === 0 && (
+    <>
+      <Panel
+        title="Gestión de usuarios"
+        description="Administra las personas con acceso a la plataforma"
+        action={
+          <Button size="sm" onClick={() => setOpenCreate(true)}>
+            <Plus className="mr-1.5 h-4 w-4" />
+            Nuevo usuario
+          </Button>
+        }
+      >
+        <div className="relative mb-4 max-w-sm">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Buscar por nombre o correo…"
+            className="pl-9"
+          />
+        </div>
+        <div className="overflow-x-auto rounded-md border border-border">
+          <Table>
+            <TableHeader>
               <TableRow>
-                <TableCell colSpan={5} className="py-8 text-center text-muted-foreground">
-                  No se encontraron usuarios.
-                </TableCell>
+                <TableHead>Nombre</TableHead>
+                <TableHead>Correo</TableHead>
+                <TableHead>Rol</TableHead>
+                <TableHead>Estado</TableHead>
+                <TableHead className="text-right">Acciones</TableHead>
               </TableRow>
-            )}
-          </TableBody>
-        </Table>
-      </div>
-    </Panel>
+            </TableHeader>
+            <TableBody>
+              {filtrados.map((u) => (
+                <TableRow key={u.id}>
+                  <TableCell className="font-medium text-foreground">{u.nombre_completo ?? "—"}</TableCell>
+                  <TableCell className="text-muted-foreground">{u.email ?? "—"}</TableCell>
+                  <TableCell>
+                    <span
+                      className={cn(
+                        "rounded-full px-2.5 py-0.5 text-xs font-medium",
+                        ROL_BADGE[u.rol] ?? "bg-secondary text-secondary-foreground",
+                      )}
+                    >
+                      {u.rol}
+                    </span>
+                  </TableCell>
+                  <TableCell>
+                    <Badge variant={u.activa ? "default" : "secondary"}>
+                      {u.activa ? "Activa" : "Inactiva"}
+                    </Badge>
+                  </TableCell>
+                  <TableCell className="flex justify-end gap-1">
+                    <Button 
+                      variant="ghost" 
+                      size="sm"
+                      onClick={() => openEditDialog(u)}
+                    >
+                      <Pencil className="h-4 w-4" />
+                      <span className="sr-only">Editar {u.nombre_completo}</span>
+                    </Button>
+                    <Button 
+                      variant="ghost" 
+                      size="sm"
+                      onClick={() => handleDeleteUser(u.id)}
+                      className="text-destructive hover:bg-destructive/10"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                      <span className="sr-only">Eliminar {u.nombre_completo}</span>
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              ))}
+              {filtrados.length === 0 && (
+                <TableRow>
+                  <TableCell colSpan={5} className="py-8 text-center text-muted-foreground">
+                    No se encontraron usuarios.
+                  </TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
+        </div>
+      </Panel>
+
+      {/* Dialog para crear usuario */}
+      <Dialog open={openCreate} onOpenChange={setOpenCreate}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Crear nuevo usuario</DialogTitle>
+            <DialogDescription>Ingresa los datos del nuevo usuario en la plataforma.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="new-nombre">Nombre completo</Label>
+              <Input
+                id="new-nombre"
+                value={newNombre}
+                onChange={(e) => setNewNombre(e.target.value)}
+                placeholder="María García"
+              />
+            </div>
+            <div>
+              <Label htmlFor="new-email">Correo</Label>
+              <Input
+                id="new-email"
+                type="email"
+                value={newEmail}
+                onChange={(e) => setNewEmail(e.target.value)}
+                placeholder="maria@ejemplo.com"
+              />
+            </div>
+            <div>
+              <Label htmlFor="new-rol">Rol</Label>
+              <select
+                id="new-rol"
+                value={newRol}
+                onChange={(e) => setNewRol(e.target.value)}
+                className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <option value="investigadora">Investigadora</option>
+                <option value="administradora">Administradora</option>
+                <option value="formadora">Formadora</option>
+                <option value="mujer_emprendedora">Mujer emprendedora</option>
+                <option value="institucion_aliada">Institución aliada</option>
+              </select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setOpenCreate(false)}>
+              Cancelar
+            </Button>
+            <Button onClick={handleCreateUser} disabled={loading}>
+              {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Crear usuario
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog para editar usuario */}
+      <Dialog open={openEdit} onOpenChange={setOpenEdit}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Editar usuario</DialogTitle>
+            <DialogDescription>Actualiza los datos del usuario.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="edit-nombre">Nombre completo</Label>
+              <Input
+                id="edit-nombre"
+                value={editNombre}
+                onChange={(e) => setEditNombre(e.target.value)}
+              />
+            </div>
+            <div>
+              <Label htmlFor="edit-email">Correo</Label>
+              <Input
+                id="edit-email"
+                type="email"
+                value={editEmail}
+                onChange={(e) => setEditEmail(e.target.value)}
+              />
+            </div>
+            <div>
+              <Label htmlFor="edit-rol">Rol</Label>
+              <select
+                id="edit-rol"
+                value={editRol}
+                onChange={(e) => setEditRol(e.target.value)}
+                className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <option value="Investigadora">Investigadora</option>
+                <option value="Administradora">Administradora</option>
+                <option value="Formadora">Formadora</option>
+                <option value="Mujer emprendedora">Mujer emprendedora</option>
+                <option value="Institución aliada">Institución aliada</option>
+              </select>
+            </div>
+            <div className="flex items-center gap-2">
+              <Switch
+                id="edit-activa"
+                checked={editActiva}
+                onCheckedChange={setEditActiva}
+              />
+              <Label htmlFor="edit-activa">Cuenta activa</Label>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setOpenEdit(false)}>
+              Cancelar
+            </Button>
+            <Button onClick={handleUpdateUser} disabled={loading}>
+              {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Guardar cambios
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
   )
 }
 
