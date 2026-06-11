@@ -1,6 +1,7 @@
 "use server"
 
 import { createClient } from "@/lib/supabase/server"
+import { createAdminClient } from "@/lib/supabase/admin"
 import { revalidatePath } from "next/cache"
 
 export type Usuario = {
@@ -22,6 +23,14 @@ const ROLES_LABEL: Record<string, string> = {
   formadora:          "Formadora",
   mujer_emprendedora: "Mujer emprendedora",
   institucion_aliada: "Institución aliada",
+}
+
+const ROLES_INVERSO: Record<string, string> = {
+  "Administradora": "administradora",
+  "Investigadora": "investigadora",
+  "Formadora": "formadora",
+  "Mujer emprendedora": "mujer_emprendedora",
+  "Institución aliada": "institucion_aliada",
 }
 
 const demoUsuarios: Usuario[] = [
@@ -81,7 +90,6 @@ export async function obtenerUsuarios(): Promise<Usuario[]> {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return demoUsuarios
 
-    // Con RLS activa, la administradora puede ver todos los registros
     const { data, error } = await supabase
       .from("perfiles_usuario")
       .select("id, nombre_completo, email, telefono, breve_descripcion, rol, linkedin, avatar_url, notificaciones_activas, cuenta_activa")
@@ -106,6 +114,31 @@ export async function obtenerUsuarios(): Promise<Usuario[]> {
   }
 }
 
+// Función auxiliar para generar contraseña temporal segura
+function generarContraseñaTemporal(): string {
+  const mayusculas = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+  const minusculas = "abcdefghijklmnopqrstuvwxyz"
+  const numeros = "0123456789"
+  const especiales = "!@#$%^&*"
+  
+  const todas = mayusculas + minusculas + numeros + especiales
+  let password = ""
+  
+  // Asegurar al menos un carácter de cada tipo
+  password += mayusculas[Math.floor(Math.random() * mayusculas.length)]
+  password += minusculas[Math.floor(Math.random() * minusculas.length)]
+  password += numeros[Math.floor(Math.random() * numeros.length)]
+  password += especiales[Math.floor(Math.random() * especiales.length)]
+  
+  // Completar a 12 caracteres
+  for (let i = password.length; i < 12; i++) {
+    password += todas[Math.floor(Math.random() * todas.length)]
+  }
+  
+  // Mezclar
+  return password.split('').sort(() => Math.random() - 0.5).join('')
+}
+
 export async function crearUsuario(
   email: string,
   nombreCompleto: string,
@@ -113,37 +146,120 @@ export async function crearUsuario(
 ): Promise<{ ok: boolean; message: string }> {
   try {
     const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return { ok: false, message: "No autenticado." }
-
-    const { data: authData, error: authError } = await supabase.auth.admin.createUser({
-      email,
-      password: Math.random().toString(36).slice(-12),
-      email_confirm: true,
-    })
-
-    if (authError || !authData.user) {
-      return { ok: false, message: authError?.message ?? "Error al crear usuario." }
+    
+    // 1. Verificar usuario autenticado
+    const { data: { user: currentUser }, error: authError } = await supabase.auth.getUser()
+    
+    if (authError || !currentUser) {
+      return { ok: false, message: "No autenticado. Inicia sesión nuevamente." }
     }
-
+    
+    // 2. VERIFICAR ROL DE ADMINISTRADORA
+    const { data: perfil, error: perfilError } = await supabase
+      .from("perfiles_usuario")
+      .select("rol")
+      .eq("id", currentUser.id)
+      .single()
+    
+    if (perfilError) {
+      console.error("Error al verificar rol:", perfilError)
+      return { ok: false, message: "Error al verificar permisos de administrador." }
+    }
+    
+    // Verificar que el rol sea 'administradora' (minúsculas como en la BD)
+    if (perfil.rol !== 'administradora') {
+      console.warn(`Intento de crear usuario por usuario no administrador. Rol: ${perfil.rol}`)
+      return { 
+        ok: false, 
+        message: "User not allowed: Solo las usuarias con rol Administradora pueden crear nuevos usuarios." 
+      }
+    }
+    
+    // 3. Validar datos de entrada
+    if (!email || !email.includes('@')) {
+      return { ok: false, message: "Correo electrónico inválido." }
+    }
+    
+    if (!nombreCompleto || nombreCompleto.trim().length < 3) {
+      return { ok: false, message: "El nombre completo debe tener al menos 3 caracteres." }
+    }
+    
+    // 4. Usar ADMIN CLIENT para crear usuario
+    const supabaseAdmin = createAdminClient()
+    
+    // Generar contraseña temporal segura
+    const tempPassword = generarContraseñaTemporal()
+    
+    // Normalizar el rol a minúsculas para la BD
+    const rolNormalizado = ROLES_INVERSO[rol] || rol.toLowerCase().replace(/\s+/g, '_')
+    
+    const { data: authData, error: createError } = await supabaseAdmin.auth.admin.createUser({
+      email: email.trim().toLowerCase(),
+      password: tempPassword,
+      email_confirm: true,
+      user_metadata: {
+        nombre_completo: nombreCompleto.trim(),
+        rol_asignado: rolNormalizado
+      }
+    })
+    
+    if (createError) {
+      console.error("Error al crear usuario en auth:", createError)
+      
+      // Manejar errores específicos
+      if (createError.message.includes("already registered")) {
+        return { ok: false, message: "Este correo electrónico ya está registrado." }
+      }
+      
+      if (createError.message.includes("invalid email")) {
+        return { ok: false, message: "El formato del correo electrónico no es válido." }
+      }
+      
+      return { ok: false, message: `Error al crear usuario: ${createError.message}` }
+    }
+    
+    if (!authData.user) {
+      return { ok: false, message: "No se pudo crear el usuario en el sistema de autenticación." }
+    }
+    
     const newUserId = authData.user.id
-
-    const { error: profileError } = await supabase
+    
+    // 5. Crear perfil en la tabla perfiles_usuario
+    const { error: profileError } = await supabaseAdmin
       .from("perfiles_usuario")
       .insert({
         id: newUserId,
-        nombre_completo: nombreCompleto,
-        email,
-        rol,
+        nombre_completo: nombreCompleto.trim(),
+        email: email.trim().toLowerCase(),
+        rol: rolNormalizado,
         cuenta_activa: true,
+        fecha_registro: new Date().toISOString(),
+        notificaciones_activas: true,
       })
-
-    if (profileError) return { ok: false, message: profileError.message }
-
+    
+    if (profileError) {
+      console.error("Error al crear perfil:", profileError)
+      // El usuario ya existe en auth, pero el perfil falló
+      return { 
+        ok: false, 
+        message: `Usuario creado pero hubo un error al configurar su perfil: ${profileError.message}. Por favor, contacta a soporte.` 
+      }
+    }
+    
+    // 6. Revalidar la página para mostrar el nuevo usuario
     revalidatePath("/configuracion")
-    return { ok: true, message: "Usuario creado exitosamente." }
-  } catch (e) {
-    return { ok: false, message: String(e) }
+    
+    return { 
+      ok: true, 
+      message: `✅ Usuario creado exitosamente. Se ha enviado un correo a ${email} con instrucciones para acceder.` 
+    }
+    
+  } catch (error) {
+    console.error("Error inesperado en crearUsuario:", error)
+    return { 
+      ok: false, 
+      message: error instanceof Error ? error.message : "Error desconocido al crear usuario." 
+    }
   }
 }
 
@@ -153,53 +269,177 @@ export async function actualizarUsuario(
 ): Promise<{ ok: boolean; message: string }> {
   try {
     const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return { ok: false, message: "No autenticado." }
-
-    // Convertir etiqueta legible → valor ENUM si viene como "Investigadora" → "investigadora"
-    const rolEnum = data.rol
-      ? Object.entries(ROLES_LABEL).find(([, v]) => v === data.rol)?.[0] ?? data.rol.toLowerCase().replace(/\s+/g, "_")
-      : undefined
-
-    const { error } = await supabase
+    
+    // Verificar autenticación
+    const { data: { user: currentUser }, error: authError } = await supabase.auth.getUser()
+    if (authError || !currentUser) {
+      return { ok: false, message: "No autenticado." }
+    }
+    
+    // Verificar si es administradora
+    const { data: perfil, error: perfilError } = await supabase
       .from("perfiles_usuario")
-      .update({
-        nombre_completo:      data.nombre_completo,
-        email:                data.email,
-        telefono:             data.telefono,
-        breve_descripcion:    data.breve_descripcion,
-        linkedin:             data.linkedin,
-        ...(rolEnum ? { rol: rolEnum } : {}),
-        cuenta_activa:        data.activa,
-        fecha_actualizacion:  new Date().toISOString(),
-      })
+      .select("rol")
+      .eq("id", currentUser.id)
+      .single()
+    
+    if (perfilError) {
+      return { ok: false, message: "Error al verificar permisos." }
+    }
+    
+    const esAdmin = perfil?.rol === 'administradora'
+    
+    // Si no es admin, solo puede actualizar su propio perfil
+    if (!esAdmin && currentUser.id !== userId) {
+      return { ok: false, message: "No tienes permiso para actualizar otros usuarios." }
+    }
+    
+    // Si no es admin, no puede cambiar el rol o estado de activación
+    if (!esAdmin && (data.rol !== undefined || data.activa !== undefined)) {
+      return { ok: false, message: "No tienes permiso para cambiar roles o estado de cuenta." }
+    }
+    
+    // Preparar datos de actualización
+    const updateData: any = {
+      fecha_actualizacion: new Date().toISOString(),
+    }
+    
+    if (data.nombre_completo !== undefined) {
+      updateData.nombre_completo = data.nombre_completo.trim()
+    }
+    
+    if (data.email !== undefined) {
+      updateData.email = data.email.trim().toLowerCase()
+    }
+    
+    if (data.telefono !== undefined) {
+      updateData.telefono = data.telefono
+    }
+    
+    if (data.breve_descripcion !== undefined) {
+      updateData.breve_descripcion = data.breve_descripcion
+    }
+    
+    if (data.linkedin !== undefined) {
+      updateData.linkedin = data.linkedin
+    }
+    
+    // Convertir rol de etiqueta legible a valor ENUM (solo admin)
+    if (data.rol !== undefined && esAdmin) {
+      const rolEnum = ROLES_INVERSO[data.rol] || data.rol.toLowerCase().replace(/\s+/g, '_')
+      updateData.rol = rolEnum
+    }
+    
+    // Actualizar estado de activación (solo admin)
+    if (data.activa !== undefined && esAdmin) {
+      updateData.cuenta_activa = data.activa
+    }
+    
+    const { error: updateError } = await supabase
+      .from("perfiles_usuario")
+      .update(updateData)
       .eq("id", userId)
-
-    if (error) return { ok: false, message: error.message }
-
+    
+    if (updateError) {
+      return { ok: false, message: updateError.message }
+    }
+    
     revalidatePath("/configuracion")
-    return { ok: true, message: "Usuario actualizado." }
-  } catch (e) {
-    return { ok: false, message: String(e) }
+    return { ok: true, message: "✅ Usuario actualizado correctamente." }
+    
+  } catch (error) {
+    console.error("Error en actualizarUsuario:", error)
+    return { ok: false, message: "Error al actualizar usuario." }
   }
 }
 
 export async function eliminarUsuario(userId: string): Promise<{ ok: boolean; message: string }> {
   try {
     const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return { ok: false, message: "No autenticado." }
-
-    const { error } = await supabase
+    
+    // Verificar autenticación
+    const { data: { user: currentUser }, error: authError } = await supabase.auth.getUser()
+    if (authError || !currentUser) {
+      return { ok: false, message: "No autenticado." }
+    }
+    
+    // Verificar si es administradora
+    const { data: perfil, error: perfilError } = await supabase
       .from("perfiles_usuario")
-      .update({ cuenta_activa: false, fecha_actualizacion: new Date().toISOString() })
+      .select("rol")
+      .eq("id", currentUser.id)
+      .single()
+    
+    if (perfilError) {
+      return { ok: false, message: "Error al verificar permisos." }
+    }
+    
+    // Solo administradoras pueden eliminar/desactivar usuarios
+    if (perfil?.rol !== 'administradora') {
+      return { ok: false, message: "User not allowed: Solo administradoras pueden eliminar usuarios." }
+    }
+    
+    // No permitir eliminarse a sí misma
+    if (userId === currentUser.id) {
+      return { ok: false, message: "No puedes desactivar tu propio usuario." }
+    }
+    
+    // En lugar de eliminar, desactivamos el usuario (soft delete)
+    const { error: updateError } = await supabase
+      .from("perfiles_usuario")
+      .update({ 
+        cuenta_activa: false, 
+        fecha_actualizacion: new Date().toISOString() 
+      })
       .eq("id", userId)
-
-    if (error) return { ok: false, message: error.message }
-
+    
+    if (updateError) {
+      return { ok: false, message: updateError.message }
+    }
+    
     revalidatePath("/configuracion")
-    return { ok: true, message: "Usuario desactivado." }
-  } catch (e) {
-    return { ok: false, message: String(e) }
+    return { ok: true, message: "✅ Usuario desactivado correctamente." }
+    
+  } catch (error) {
+    console.error("Error en eliminarUsuario:", error)
+    return { ok: false, message: "Error al desactivar usuario." }
+  }
+}
+
+// Función para reactivar un usuario
+export async function reactivarUsuario(userId: string): Promise<{ ok: boolean; message: string }> {
+  try {
+    const supabase = await createClient()
+    
+    const { data: { user: currentUser } } = await supabase.auth.getUser()
+    if (!currentUser) return { ok: false, message: "No autenticado." }
+    
+    const { data: perfil } = await supabase
+      .from("perfiles_usuario")
+      .select("rol")
+      .eq("id", currentUser.id)
+      .single()
+    
+    if (perfil?.rol !== 'administradora') {
+      return { ok: false, message: "No tienes permisos para reactivar usuarios." }
+    }
+    
+    const { error: updateError } = await supabase
+      .from("perfiles_usuario")
+      .update({ 
+        cuenta_activa: true, 
+        fecha_actualizacion: new Date().toISOString() 
+      })
+      .eq("id", userId)
+    
+    if (updateError) {
+      return { ok: false, message: updateError.message }
+    }
+    
+    revalidatePath("/configuracion")
+    return { ok: true, message: "✅ Usuario reactivado correctamente." }
+    
+  } catch (error) {
+    return { ok: false, message: "Error al reactivar usuario." }
   }
 }
