@@ -372,13 +372,13 @@ export async function eliminarUsuario(userId: string): Promise<{ ok: boolean; me
   try {
     const supabase = await createClient()
     
-    // Verificar autenticación
+    // 1. Verificar autenticación
     const { data: { user: currentUser }, error: authError } = await supabase.auth.getUser()
     if (authError || !currentUser) {
       return { ok: false, message: "No autenticado." }
     }
     
-    // Verificar si es administradora
+    // 2. Verificar si es administradora
     const { data: perfil, error: perfilError } = await supabase
       .from("perfiles_usuario")
       .select("rol")
@@ -389,17 +389,86 @@ export async function eliminarUsuario(userId: string): Promise<{ ok: boolean; me
       return { ok: false, message: "Error al verificar permisos." }
     }
     
-    // Solo administradoras pueden eliminar/desactivar usuarios
+    // Solo administradoras pueden eliminar usuarios
     if (perfil?.rol !== 'administradora') {
       return { ok: false, message: "User not allowed: Solo administradoras pueden eliminar usuarios." }
     }
     
-    // No permitir eliminarse a sí misma
+    // 3. No permitir eliminarse a sí misma
+    if (userId === currentUser.id) {
+      return { ok: false, message: "No puedes eliminar tu propio usuario." }
+    }
+    
+    // 4. Verificar que el usuario existe
+    const { data: userToDelete, error: checkError } = await supabase
+      .from("perfiles_usuario")
+      .select("id, email")
+      .eq("id", userId)
+      .single()
+    
+    if (checkError || !userToDelete) {
+      return { ok: false, message: "El usuario no existe." }
+    }
+    
+    // 5. Usar ADMIN CLIENT para eliminar de auth.users
+    const supabaseAdmin = createAdminClient()
+    
+    const { error: deleteAuthError } = await supabaseAdmin.auth.admin.deleteUser(userId)
+    
+    if (deleteAuthError) {
+      console.error("Error al eliminar de auth:", deleteAuthError)
+      return { ok: false, message: `Error al eliminar usuario: ${deleteAuthError.message}` }
+    }
+    
+    // 6. Nota: Como la tabla perfiles_usuario tiene ON DELETE CASCADE,
+    // el perfil se eliminará automáticamente cuando se elimine de auth.users.
+    // Si no tienes CASCADE, descomenta el código de abajo:
+    
+    /*
+    // Eliminar perfil manualmente (si no hay CASCADE)
+    const { error: deleteProfileError } = await supabaseAdmin
+      .from("perfiles_usuario")
+      .delete()
+      .eq("id", userId)
+    
+    if (deleteProfileError) {
+      console.error("Error al eliminar perfil:", deleteProfileError)
+      return { ok: false, message: `Error al eliminar perfil: ${deleteProfileError.message}` }
+    }
+    */
+    
+    revalidatePath("/configuracion")
+    return { ok: true, message: `✅ Usuario ${userToDelete.email} eliminado permanentemente.` }
+    
+  } catch (error) {
+    console.error("Error en eliminarUsuario:", error)
+    return { ok: false, message: "Error al eliminar usuario." }
+  }
+}
+
+// Función para desactivar usuario (soft delete)
+export async function desactivarUsuario(userId: string): Promise<{ ok: boolean; message: string }> {
+  try {
+    const supabase = await createClient()
+    
+    const { data: { user: currentUser } } = await supabase.auth.getUser()
+    if (!currentUser) return { ok: false, message: "No autenticado." }
+    
+    const { data: perfil } = await supabase
+      .from("perfiles_usuario")
+      .select("rol")
+      .eq("id", currentUser.id)
+      .single()
+    
+    if (perfil?.rol !== 'administradora') {
+      return { ok: false, message: "No tienes permisos para desactivar usuarios." }
+    }
+    
+    // No permitir desactivarse a sí misma
     if (userId === currentUser.id) {
       return { ok: false, message: "No puedes desactivar tu propio usuario." }
     }
     
-    // En lugar de eliminar, desactivamos el usuario (soft delete)
     const { error: updateError } = await supabase
       .from("perfiles_usuario")
       .update({ 
@@ -416,7 +485,6 @@ export async function eliminarUsuario(userId: string): Promise<{ ok: boolean; me
     return { ok: true, message: "✅ Usuario desactivado correctamente." }
     
   } catch (error) {
-    console.error("Error en eliminarUsuario:", error)
     return { ok: false, message: "Error al desactivar usuario." }
   }
 }
