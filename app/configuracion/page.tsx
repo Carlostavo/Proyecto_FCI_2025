@@ -1,6 +1,5 @@
 import { AppShell } from "@/components/dashboard/app-shell"
 import { Toolbar } from "@/components/dashboard/header"
-import { ConfiguracionTabs } from "@/components/configuracion/configuracion-tabs"
 import { obtenerUsuarios } from "@/lib/usuarios-actions"
 import { getRolActual } from "@/lib/perfil"
 import { ConfiguracionClientWrapper } from "@/components/configuracion/configuracion-client-wrapper"

@@ -9,6 +9,7 @@ export type Perfil = {
   email: string | null
   telefono: string | null
   breve_descripcion: string | null
+  rol: string | null
   linkedin: string | null
   avatar_url: string | null
   notificaciones_activas: boolean
@@ -24,14 +25,12 @@ export type Notificacion = {
 }
 
 const ROLES_LABEL: Record<string, string> = {
-  administradora: "Administradora",
-  investigadora: "Investigadora",
-  formadora: "Formadora",
+  administradora:     "Administradora",
+  investigadora:      "Investigadora",
+  formadora:          "Formadora",
   mujer_emprendedora: "Mujer emprendedora",
   institucion_aliada: "Institución aliada",
 }
-
-/** Convierte cada palabra a mayúscula inicial: "maria perez" -> "Maria Perez" */
 
 export function isSupabaseConfigured() {
   return Boolean(
@@ -43,16 +42,17 @@ export type PerfilContext = {
   perfil: Perfil | null
   nombre: string
   rol: string
+  rolRaw: string | null
   avatarUrl: string | null
   notificacionesActivas: boolean
 }
 
-/** Datos de demostración mientras Supabase no esté vinculado. */
 function demoContext(): PerfilContext {
   return {
     perfil: null,
     nombre: "Usuario Invitado",
     rol: "Miembro del proyecto",
+    rolRaw: null,
     avatarUrl: null,
     notificacionesActivas: true,
   }
@@ -71,42 +71,32 @@ export async function getPerfilContext(): Promise<PerfilContext> {
   const { data: perfil } = await supabase
     .from("perfiles_usuario")
     .select(
-      "id, nombre_completo, email, telefono, breve_descripcion, linkedin, avatar_url, notificaciones_activas",
+      "id, nombre_completo, email, telefono, breve_descripcion, rol, linkedin, avatar_url, notificaciones_activas",
     )
     .eq("id", user.id)
     .maybeSingle()
 
-  const { data: rolData } = await supabase
-    .from("roles_usuario")
-    .select("rol")
-    .eq("id_usuario", user.id)
-    .maybeSingle()
-
+  // Nombre: usar nombre_completo del perfil; nunca mostrar el email como nombre
   const nombreBase =
-    perfil?.nombre_completo ||
-    (user.user_metadata?.nombre_completo as string) ||
-    user.email ||
-    "Usuario"
+    perfil?.nombre_completo?.trim() ||
+    (user.user_metadata?.nombre_completo as string | undefined)?.trim() ||
+    null
+
+  const rolRaw = perfil?.rol ?? null
 
   return {
     perfil: (perfil as Perfil) ?? null,
-    nombre: toTitleCase(nombreBase),
-    rol: rolData?.rol ? (ROLES_LABEL[rolData.rol] ?? rolData.rol) : "Miembro del proyecto",
+    nombre: nombreBase ? toTitleCase(nombreBase) : "Sin nombre",
+    rol: rolRaw ? (ROLES_LABEL[rolRaw] ?? rolRaw) : "Miembro del proyecto",
+    rolRaw,
     avatarUrl: perfil?.avatar_url ?? null,
     notificacionesActivas: perfil?.notificaciones_activas ?? true,
   }
 }
 
-/** Obtiene el rol en minúsculas del usuario actual (para comparaciones) */
+/** Obtiene el rol en bruto (minúsculas) del usuario autenticado. */
 export async function getRolActual(): Promise<string | null> {
-  // En desarrollo sin Supabase, permitir override via localStorage para testing
-  if (!isSupabaseConfigured()) {
-    if (typeof window !== "undefined") {
-      const overrideRol = localStorage.getItem("dev_rol_override")
-      if (overrideRol) return overrideRol
-    }
-    return null
-  }
+  if (!isSupabaseConfigured()) return null
 
   const supabase = await createClient()
   const {
@@ -115,16 +105,16 @@ export async function getRolActual(): Promise<string | null> {
 
   if (!user) return null
 
-  const { data: rolData } = await supabase
-    .from("roles_usuario")
+  const { data: perfil } = await supabase
+    .from("perfiles_usuario")
     .select("rol")
-    .eq("id_usuario", user.id)
+    .eq("id", user.id)
     .maybeSingle()
 
-  return rolData?.rol ?? null
+  return perfil?.rol ?? null
 }
 
-/** Notificaciones de ejemplo. Reemplazar por una tabla real cuando exista. */
+/** Notificaciones de ejemplo. Reemplazar por tabla real cuando exista. */
 export function getNotificacionesDemo(): Notificacion[] {
   return [
     {
