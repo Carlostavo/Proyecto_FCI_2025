@@ -1,4 +1,7 @@
 import { createClient } from "@/lib/supabase/server"
+import { toTitleCase } from "@/lib/format"
+
+export { toTitleCase }
 
 export type Perfil = {
   id: string
@@ -6,11 +9,9 @@ export type Perfil = {
   email: string | null
   telefono: string | null
   breve_descripcion: string | null
-  emprendimiento_tipo: string | null
-  saberes_ancestrales: string | null
+  linkedin: string | null
   avatar_url: string | null
   notificaciones_activas: boolean
-  diagnostico_completado: boolean | null
 }
 
 export type Notificacion = {
@@ -31,14 +32,6 @@ const ROLES_LABEL: Record<string, string> = {
 }
 
 /** Convierte cada palabra a mayúscula inicial: "maria perez" -> "Maria Perez" */
-export function toTitleCase(value: string): string {
-  return value
-    .toLowerCase()
-    .split(" ")
-    .filter(Boolean)
-    .map((p) => p.charAt(0).toUpperCase() + p.slice(1))
-    .join(" ")
-}
 
 export function isSupabaseConfigured() {
   return Boolean(
@@ -78,7 +71,7 @@ export async function getPerfilContext(): Promise<PerfilContext> {
   const { data: perfil } = await supabase
     .from("perfiles_usuario")
     .select(
-      "id, nombre_completo, email, telefono, breve_descripcion, emprendimiento_tipo, saberes_ancestrales, avatar_url, notificaciones_activas, diagnostico_completado",
+      "id, nombre_completo, email, telefono, breve_descripcion, linkedin, avatar_url, notificaciones_activas",
     )
     .eq("id", user.id)
     .maybeSingle()
