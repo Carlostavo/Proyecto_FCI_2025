@@ -19,54 +19,44 @@ export default function ResetPasswordForm() {
   const [loading, setLoading] = useState(false)
   const [success, setSuccess] = useState(false)
   const [verifyingSession, setVerifyingSession] = useState(true)
-  const [hasValidSession, setHasValidSession] = useState(false)
   const router = useRouter()
   const searchParams = useSearchParams()
   const supabase = createClient()
 
   useEffect(() => {
-    const verifySession = async () => {
+    const verifyAndExchangeCode = async () => {
       const code = searchParams.get("code")
-
-      // Caso 1: Supabase redirigió con un código PKCE — intercambiarlo en el browser
-      // (el browser tiene el code_verifier en cookies, el servidor no puede accederlo)
-      if (code) {
-        const { data, error: exchangeError } = await supabase.auth.exchangeCodeForSession(code)
-
-        if (exchangeError) {
-          // Si el código ya fue usado, puede que la sesión ya esté activa
-          const { data: { session } } = await supabase.auth.getSession()
-          if (session?.user) {
-            setHasValidSession(true)
+      
+      try {
+        // Si hay un código, intercambiarlo por una sesión
+        if (code) {
+          const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(code)
+          
+          if (exchangeError) {
+            console.error("Error exchanging code:", exchangeError)
+            setError("El enlace de recuperación ha expirado o ya fue utilizado. Por favor, solicita uno nuevo.")
             setVerifyingSession(false)
             return
           }
-          setError("El enlace de recuperación ha expirado o ya fue utilizado. Por favor, solicita uno nuevo.")
-          setVerifyingSession(false)
-          return
         }
-
-        if (data?.session) {
-          setHasValidSession(true)
+        
+        // Verificar que tenemos una sesión válida
+        const { data: { session } } = await supabase.auth.getSession()
+        
+        if (session?.user) {
           setVerifyingSession(false)
-          return
+        } else {
+          setError("No se pudo verificar tu identidad. Por favor, solicita un nuevo enlace de recuperación.")
+          setVerifyingSession(false)
         }
-      }
-
-      // Caso 2: No hay código — verificar si ya existe una sesión activa
-      const { data: { session } } = await supabase.auth.getSession()
-      if (session?.user) {
-        setHasValidSession(true)
+      } catch (err) {
+        console.error("Error in verifyAndExchangeCode:", err)
+        setError("Ocurrió un error al verificar el enlace. Por favor, solicita uno nuevo.")
         setVerifyingSession(false)
-        return
       }
-
-      // No hay código ni sesión válida
-      setError("El enlace de recuperación no es válido o ha expirado. Por favor, solicita uno nuevo.")
-      setVerifyingSession(false)
     }
 
-    verifySession()
+    verifyAndExchangeCode()
   }, [searchParams, supabase])
 
   const handleResetPassword = async (e: React.FormEvent) => {
@@ -95,8 +85,8 @@ export default function ResetPasswordForm() {
       }
 
       setSuccess(true)
-      setLoading(false)
-
+      
+      // Cerrar sesión después de cambiar la contraseña
       await supabase.auth.signOut()
 
       setTimeout(() => {
@@ -149,8 +139,7 @@ export default function ResetPasswordForm() {
     )
   }
 
-  // Si no hay sesión válida, mostrar el error
-  if (!hasValidSession && error) {
+  if (error) {
     return (
       <AuthShell
         title="Enlace Inválido"
