@@ -1,3 +1,4 @@
+// /app/auth/callback/route.ts
 import { createClient } from "@/lib/supabase/server"
 import { NextRequest, NextResponse } from "next/server"
 
@@ -20,38 +21,36 @@ export async function GET(request: NextRequest) {
     }
   }
 
-  console.log("🔍 Auth Callback - Params:", { code: code?.substring(0, 20), type, next })
+  console.log("🔍 Callback - Type:", type, "Code:", code?.substring(0, 20))
 
-  // 🔥 IMPORTANTE: Para recovery, NO procesamos el código aquí
-  // Dejamos que el cliente lo procese (tiene el code_verifier en cookies)
-  if (type === "recovery") {
-    console.log("📧 Recovery flow - Redirigiendo a reset-password con código")
-    // Redirigimos a reset-password con el código y un flag verified=false
-    return NextResponse.redirect(getRedirectUrl(`/auth/reset-password?code=${code || ''}`))
-  }
-
-  const supabase = await createClient()
-
-  // Procesar códigos de otros tipos (signup, login)
+  // 🔑 Para recovery, el servidor debe intercambiar el código
+  // porque tiene acceso a las cookies con el code_verifier
   if (code) {
-    console.log("🔄 Procesando código para tipo:", type)
+    const supabase = await createClient()
     const { error } = await supabase.auth.exchangeCodeForSession(code)
+    
     if (!error) {
-      console.log("✅ Código procesado exitosamente")
+      console.log("✅ Código intercambiado exitosamente en el servidor")
+      
+      // Si es recovery, redirigir a reset-password
+      if (type === "recovery") {
+        return NextResponse.redirect(getRedirectUrl("/auth/reset-password?verified=true"))
+      }
+      
       return NextResponse.redirect(getRedirectUrl(next))
     } else {
       console.error("❌ Error exchanging code:", error.message)
-      return NextResponse.redirect(getRedirectUrl("/auth/login?error=auth_error"))
+      return NextResponse.redirect(getRedirectUrl(`/auth/login?error=auth_error&message=${encodeURIComponent(error.message)}`))
     }
   }
 
-  // Si hay sesión activa, ir al next
+  // Si no hay código, verificar sesión existente
+  const supabase = await createClient()
   const { data: { session } } = await supabase.auth.getSession()
+  
   if (session) {
-    console.log("✅ Sesión activa encontrada")
     return NextResponse.redirect(getRedirectUrl(next))
   }
 
-  console.log("⚠️ No se encontró sesión ni código válido")
-  return NextResponse.redirect(getRedirectUrl("/auth/login?error=auth_error"))
+  return NextResponse.redirect(getRedirectUrl("/auth/login?error=no_code"))
 }
