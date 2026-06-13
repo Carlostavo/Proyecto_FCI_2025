@@ -242,10 +242,11 @@ export async function crearUsuario(
     }
     
     // 6. Enviar correo de recuperación de contraseña para que el usuario establezca su propia contraseña
+    const redirectUrl = `${process.env.NEXT_PUBLIC_SITE_URL || 'https://proyecto-fci-2025.vercel.app'}/auth/reset-password?type=recovery`
     const { error: resetError } = await supabase.auth.resetPasswordForEmail(
       email.trim().toLowerCase(),
       {
-        redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL || 'https://proyecto-fci-2025.vercel.app'}/auth/reset-password`,
+        redirectTo: redirectUrl,
       }
     )
 

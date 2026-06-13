@@ -21,18 +21,35 @@ export default function ResetPasswordPage() {
   const supabase = createClient()
 
   useEffect(() => {
-    // Verificar que hay una sesión válida (usuario con token)
+    // Verificar que hay una sesión válida con token de recuperación
     const checkSession = async () => {
-      const { data: { session } } = await supabase.auth.getSession()
-      if (!session) {
-        setError("El enlace de recuperación no es válido o ha expirado. Por favor, intenta de nuevo.")
-      } else {
+      try {
+        // Esperamos a que Supabase procese el hash del URL y cree la sesión
+        // La sesión se crea automáticamente cuando el usuario abre el enlace del email
+        const { data: { session } } = await supabase.auth.getSession()
+        
+        if (!session) {
+          console.error("[v0] No session found - check URL has #access_token parameter")
+          setError("El enlace de recuperación no es válido o ha expirado. Solicita uno nuevo.")
+          return
+        }
+
+        // Verificar que el token tiene la característica de recuperación de contraseña
+        const user = session.user
+        if (!user) {
+          setError("No se pudo verificar tu identidad. Por favor, intenta de nuevo.")
+          return
+        }
+
         setIsReady(true)
+      } catch (err) {
+        console.error("[v0] Error checking session:", err)
+        setError("Ocurrió un error al verificar tu sesión. Por favor, intenta de nuevo.")
       }
     }
 
     checkSession()
-  }, [supabase.auth])
+  }, [supabase])
 
   const handleResetPassword = async (e: React.FormEvent) => {
     e.preventDefault()

@@ -14,7 +14,7 @@
 Esto es **CRÍTICO** para que los enlaces de recuperación funcionen.
 
 1. Ve a: **Authentication** → **URL Configuration**
-2. En la sección "Redirect URLs", agregua estas URLs:
+2. En la sección "Redirect URLs", agrega estas URLs:
 
 ```
 https://proyecto-fci-2025.vercel.app/auth/callback
@@ -28,6 +28,15 @@ http://localhost:3000/auth/reset-password
 ```
 
 3. Haz clic en **Save**
+
+⚠️ **IMPORTANTE:**
+- Sin estas URLs configuradas, Supabase **NO enviará emails de recuperación**
+- Después de agregar, **espera 30 segundos** antes de probar
+- Los emails se envían con esta estructura:
+  ```
+  https://proyecto-fci-2025.vercel.app/auth/reset-password?type=recovery#access_token=xxxxx
+  ```
+- Si no ves el email, primero verifica que estas URLs existan
 
 ## Paso 3: Configurar Variables de Entorno en Vercel
 
@@ -175,16 +184,72 @@ Si quieres personalizar los emails:
 | Ver logs de email | Supabase → Email Logs |
 | Reset manual de usuario | Supabase → Auth → Users → 3 dots → Reset password |
 
+## 🔑 Entendiendo el Redirect URL para Recuperación de Contraseña
+
+### ¿Qué es el redirectUrl?
+
+El `redirectUrl` es la URL a donde Supabase redirige al usuario después de hacer clic en el link del email.
+
+### Estructura del Link en el Email:
+
+```
+https://proyecto-fci-2025.vercel.app/auth/reset-password?type=recovery#access_token=xxx&expires_in=3600&token_type=Bearer&type=recovery
+```
+
+### Dónde se configura:
+
+1. **En el código:**
+   ```typescript
+   // app/auth/forgot-password/page.tsx
+   const redirectUrl = `${window.location.origin}/auth/reset-password?type=recovery`
+   const { error } = await supabase.auth.resetPasswordForEmail(email, {
+     redirectTo: redirectUrl,
+   })
+   ```
+
+2. **En Supabase (URL Configuration):**
+   - Debes agregar: `https://proyecto-fci-2025.vercel.app/auth/reset-password`
+   - El parámetro `?type=recovery` se añade automáticamente
+
+3. **En Vercel (Environment Variables):**
+   - `NEXT_PUBLIC_SITE_URL=https://proyecto-fci-2025.vercel.app`
+   - Se usa en crearUsuario() para enviar el link correcto
+
+### Checklist del Redirect URL:
+
+- [ ] URL está en Supabase → Authentication → URL Configuration
+- [ ] URL comienza con `https://` (en producción)
+- [ ] URL es exactamente: `https://proyecto-fci-2025.vercel.app/auth/reset-password`
+- [ ] No tiene trailing slash: `❌ /auth/reset-password/`
+- [ ] La página /auth/reset-password existe en el código
+- [ ] NEXT_PUBLIC_SITE_URL está en Vercel (sin URL al final)
+
+### Troubleshooting:
+
+**Si el email no llega:**
+1. Verifica que redirectUrl existe en Supabase
+2. Espera 30 segundos después de guardar
+3. Ve a Email Logs y busca el error
+
+**Si el link no funciona:**
+1. Verifica que el URL es exacto (sin espacios, sin slash final)
+2. Verifica que la página `/auth/reset-password` existe
+3. Verifica que la página puede acceder a Supabase
+
+---
+
 ## 📞 Soporte
 
 Si algo no funciona:
 
-1. Revisa los logs:
+1. Revisa **EMAIL_TROUBLESHOOTING.md** (guía completa de problemas con emails)
+
+2. Revisa los logs:
    - Supabase → Email Logs (para errores de email)
    - Vercel → Logs (para errores de servidor)
    - Console del navegador (para errores de cliente)
 
-2. Verifica las URLs:
+3. Verifica las URLs:
    - Que estén exactamente como en Supabase
    - Sin trailing slash
    - Con https (en producción)
