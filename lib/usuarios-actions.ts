@@ -114,30 +114,7 @@ export async function obtenerUsuarios(): Promise<Usuario[]> {
   }
 }
 
-// Función auxiliar para generar contraseña temporal segura
-function generarContraseñaTemporal(): string {
-  const mayusculas = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
-  const minusculas = "abcdefghijklmnopqrstuvwxyz"
-  const numeros = "0123456789"
-  const especiales = "!@#$%^&*"
-  
-  const todas = mayusculas + minusculas + numeros + especiales
-  let password = ""
-  
-  // Asegurar al menos un carácter de cada tipo
-  password += mayusculas[Math.floor(Math.random() * mayusculas.length)]
-  password += minusculas[Math.floor(Math.random() * minusculas.length)]
-  password += numeros[Math.floor(Math.random() * numeros.length)]
-  password += especiales[Math.floor(Math.random() * especiales.length)]
-  
-  // Completar a 12 caracteres
-  for (let i = password.length; i < 12; i++) {
-    password += todas[Math.floor(Math.random() * todas.length)]
-  }
-  
-  // Mezclar
-  return password.split('').sort(() => Math.random() - 0.5).join('')
-}
+
 
 export async function crearUsuario(
   email: string,
@@ -184,8 +161,10 @@ export async function crearUsuario(
     
     // 4. Usar ADMIN CLIENT para crear usuario
     const supabaseAdmin = createAdminClient()
-    const tempPassword = generarContraseñaTemporal()
     const rolNormalizado = ROLES_INVERSO[rol] || rol.toLowerCase().replace(/\s+/g, '_')
+    
+    // Generar una contraseña aleatoria temporal (será reemplazada por el usuario)
+    const tempPassword = Math.random().toString(36).slice(-12) + Math.random().toString(36).slice(-12)
     
     const { data: authData, error: createError } = await supabaseAdmin.auth.admin.createUser({
       email: email.trim().toLowerCase(),
@@ -262,11 +241,24 @@ export async function crearUsuario(
       }
     }
     
+    // 6. Enviar correo de recuperación de contraseña para que el usuario establezca su propia contraseña
+    const { error: resetError } = await supabase.auth.resetPasswordForEmail(
+      email.trim().toLowerCase(),
+      {
+        redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL || 'https://proyecto-fci-2025.vercel.app'}/auth/reset-password`,
+      }
+    )
+
+    if (resetError) {
+      console.error("Error al enviar correo de recuperación:", resetError)
+      // No es crítico si falla, el usuario puede usar "Olvidé mi contraseña" después
+    }
+
     revalidatePath("/configuracion")
     
     return { 
       ok: true, 
-      message: `✅ Usuario creado exitosamente. Se ha enviado un correo a ${email} con instrucciones para acceder.` 
+      message: `✅ Usuario ${nombreCompleto} creado exitosamente. Se ha enviado un correo a ${email} con instrucciones para establecer su contraseña.` 
     }
     
   } catch (error) {

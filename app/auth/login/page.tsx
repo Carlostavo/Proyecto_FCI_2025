@@ -62,6 +62,9 @@ export default function LoginPage() {
               <div className="grid gap-2">
                 <div className="flex items-center justify-between">
                   <Label htmlFor="password">Contraseña</Label>
+                  <Link href="/auth/forgot-password" className="text-xs font-medium text-primary underline underline-offset-4 hover:text-primary/80">
+                    ¿Olvidaste tu contraseña?
+                  </Link>
                 </div>
                 <Input
                   id="password"
@@ -76,12 +79,6 @@ export default function LoginPage() {
                 {isLoading ? "Ingresando..." : "Ingresar"}
               </Button>
             </div>
-            <p className="mt-5 text-center text-sm text-muted-foreground">
-              ¿No tienes una cuenta?{" "}
-              <Link href="/auth/sign-up" className="font-medium text-primary underline underline-offset-4">
-                Regístrate
-              </Link>
-            </p>
           </form>
         </CardContent>
       </Card>

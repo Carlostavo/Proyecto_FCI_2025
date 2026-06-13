@@ -294,9 +294,13 @@ function GestionUsuarios({ usuarios, esAdmin }: { usuarios: Array<{ id: string; 
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Crear nuevo usuario</DialogTitle>
-            <DialogDescription>Ingresa los datos del nuevo usuario en la plataforma.</DialogDescription>
+            <DialogDescription>Ingresa los datos del nuevo usuario. Se enviará un correo con instrucciones para establecer contraseña.</DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
+            <div className="rounded-md bg-blue-50 p-3 text-sm text-blue-900">
+              <p className="font-medium">¿Cómo funciona?</p>
+              <p className="mt-1 text-xs">Se enviará un correo al nuevo usuario con un enlace para establecer su propia contraseña de forma segura.</p>
+            </div>
             <div>
               <Label htmlFor="new-nombre">Nombre completo</Label>
               <Input
@@ -336,7 +340,7 @@ function GestionUsuarios({ usuarios, esAdmin }: { usuarios: Array<{ id: string; 
             <Button variant="outline" onClick={() => setOpenCreate(false)}>
               Cancelar
             </Button>
-            <Button onClick={handleCreateUser} disabled={loading}>
+            <Button onClick={handleCreateUser} disabled={loading || !newNombre || !newEmail}>
               {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Crear usuario
             </Button>
