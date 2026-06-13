@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import { useEffect, useState } from "react"
 
 export default function ResetPasswordPage() {
@@ -18,38 +18,49 @@ export default function ResetPasswordPage() {
   const [isLoading, setIsLoading] = useState(false)
   const [isReady, setIsReady] = useState(false)
   const router = useRouter()
+  const searchParams = useSearchParams()
   const supabase = createClient()
 
   useEffect(() => {
-    // Verificar que hay una sesión válida con token de recuperación
-    const checkSession = async () => {
+    // Intercambiar el código por una sesión válida
+    const handleCodeExchange = async () => {
       try {
-        // Esperamos a que Supabase procese el hash del URL y cree la sesión
-        // La sesión se crea automáticamente cuando el usuario abre el enlace del email
-        const { data: { session } } = await supabase.auth.getSession()
+        const code = searchParams.get('code')
         
-        if (!session) {
-          console.error("[v0] No session found - check URL has #access_token parameter")
+        if (!code) {
+          setError("No se encontró código de recuperación. El enlace puede haber expirado.")
+          return
+        }
+
+        console.log("[v0] Attempting to exchange code for session:", code.substring(0, 10) + "...")
+        
+        // Intercambiar el código por una sesión
+        const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(code)
+        
+        if (exchangeError) {
+          console.error("[v0] Code exchange error:", exchangeError)
           setError("El enlace de recuperación no es válido o ha expirado. Solicita uno nuevo.")
           return
         }
 
-        // Verificar que el token tiene la característica de recuperación de contraseña
-        const user = session.user
-        if (!user) {
-          setError("No se pudo verificar tu identidad. Por favor, intenta de nuevo.")
+        // Verificar que la sesión se creó correctamente
+        const { data: { session } } = await supabase.auth.getSession()
+        
+        if (!session || !session.user) {
+          setError("No se pudo establecer tu sesión. Por favor, intenta de nuevo.")
           return
         }
 
+        console.log("[v0] Session established successfully")
         setIsReady(true)
       } catch (err) {
-        console.error("[v0] Error checking session:", err)
-        setError("Ocurrió un error al verificar tu sesión. Por favor, intenta de nuevo.")
+        console.error("[v0] Error in code exchange:", err)
+        setError("Ocurrió un error al procesar tu enlace de recuperación. Por favor, intenta de nuevo.")
       }
     }
 
-    checkSession()
-  }, [supabase])
+    handleCodeExchange()
+  }, [supabase, searchParams])
 
   const handleResetPassword = async (e: React.FormEvent) => {
     e.preventDefault()
