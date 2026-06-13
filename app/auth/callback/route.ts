@@ -20,20 +20,31 @@ export async function GET(request: NextRequest) {
     }
   }
 
+  // 🔥 IMPORTANTE: Para recovery, NO procesamos el código aquí
+  // Dejamos que el cliente lo procese (tiene el code_verifier en cookies)
+  if (type === "recovery") {
+    // Simplemente redirigimos a reset-password con el código
+    return NextResponse.redirect(getRedirectUrl(`/auth/reset-password?code=${code || ''}`))
+  }
+
+  const supabase = await createClient()
+
+  // Procesar códigos de otros tipos (signup, login)
   if (code) {
-    const supabase = await createClient()
     const { error } = await supabase.auth.exchangeCodeForSession(code)
     if (!error) {
-      // Si es un recovery (reset password), redirigir a la página de cambio de contraseña
-      if (type === "recovery") {
-        return NextResponse.redirect(getRedirectUrl("/auth/reset-password?verified=true"))
-      }
       return NextResponse.redirect(getRedirectUrl(next))
     } else {
-      console.error("[v0] Auth Callback - Error exchanging code:", error.message)
+      console.error("[Auth Callback] Error exchanging code:", error.message)
+      return NextResponse.redirect(getRedirectUrl("/auth/login?error=auth_error"))
     }
   }
 
-  // Si hay error, redirigir al login con mensaje de error
+  // Si hay sesión activa, ir al next
+  const { data: { session } } = await supabase.auth.getSession()
+  if (session) {
+    return NextResponse.redirect(getRedirectUrl(next))
+  }
+
   return NextResponse.redirect(getRedirectUrl("/auth/login?error=auth_error"))
 }
