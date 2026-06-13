@@ -245,7 +245,7 @@ export async function crearUsuario(
     const { error: resetError } = await supabase.auth.resetPasswordForEmail(
       email.trim().toLowerCase(),
       {
-        redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL || 'https://proyecto-fci-2025.vercel.app'}/auth/callback?type=recovery`,
+        redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL || 'https://proyecto-fci-2025.vercel.app'}/auth/reset-password`,
       }
     )
 
