@@ -26,31 +26,56 @@ export default function ResetPasswordForm() {
   useEffect(() => {
     const verifyAndExchangeCode = async () => {
       const code = searchParams.get("code")
+      const verified = searchParams.get("verified")
+      
+      console.log("🔍 ResetPasswordForm - Params:", { code: code?.substring(0, 20) + "...", verified })
       
       try {
-        // Si hay un código, intercambiarlo por una sesión
-        if (code) {
-          const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(code)
-          
-          if (exchangeError) {
-            console.error("Error exchanging code:", exchangeError)
-            setError("El enlace de recuperación ha expirado o ya fue utilizado. Por favor, solicita uno nuevo.")
+        // Si ya hay verified=true, solo verificamos la sesión
+        if (verified === "true") {
+          const { data: { session } } = await supabase.auth.getSession()
+          if (session?.user) {
+            console.log("✅ Sesión ya establecida")
             setVerifyingSession(false)
             return
           }
         }
         
+        // Si hay un código, intercambiarlo por una sesión
+        if (code) {
+          console.log("🔄 Intercambiando código por sesión...")
+          const { data, error: exchangeError } = await supabase.auth.exchangeCodeForSession(code)
+          
+          if (exchangeError) {
+            console.error("❌ Error exchanging code:", exchangeError)
+            setError("El enlace de recuperación ha expirado o ya fue utilizado. Por favor, solicita uno nuevo.")
+            setVerifyingSession(false)
+            return
+          }
+          
+          console.log("✅ Código intercambiado exitosamente", data?.session ? "Sesión obtenida" : "Sin sesión")
+        }
+        
         // Verificar que tenemos una sesión válida
-        const { data: { session } } = await supabase.auth.getSession()
+        const { data: { session }, error: sessionError } = await supabase.auth.getSession()
+        
+        if (sessionError) {
+          console.error("❌ Error getting session:", sessionError)
+          setError("Error al verificar tu sesión. Por favor, intenta de nuevo.")
+          setVerifyingSession(false)
+          return
+        }
         
         if (session?.user) {
+          console.log("✅ Usuario autenticado:", session.user.email)
           setVerifyingSession(false)
         } else {
+          console.log("⚠️ No hay sesión activa")
           setError("No se pudo verificar tu identidad. Por favor, solicita un nuevo enlace de recuperación.")
           setVerifyingSession(false)
         }
       } catch (err) {
-        console.error("Error in verifyAndExchangeCode:", err)
+        console.error("❌ Error in verifyAndExchangeCode:", err)
         setError("Ocurrió un error al verificar el enlace. Por favor, solicita uno nuevo.")
         setVerifyingSession(false)
       }
@@ -76,23 +101,28 @@ export default function ResetPasswordForm() {
     setLoading(true)
 
     try {
+      console.log("🔄 Actualizando contraseña...")
       const { error: updateError } = await supabase.auth.updateUser({ password })
 
       if (updateError) {
+        console.error("❌ Error updating password:", updateError)
         setError(updateError.message || "Error al actualizar la contraseña")
         setLoading(false)
         return
       }
 
+      console.log("✅ Contraseña actualizada exitosamente")
       setSuccess(true)
       
       // Cerrar sesión después de cambiar la contraseña
       await supabase.auth.signOut()
+      console.log("🔓 Sesión cerrada")
 
       setTimeout(() => {
         router.push("/auth/login")
       }, 3000)
     } catch (err: unknown) {
+      console.error("❌ Unexpected error:", err)
       setError(err instanceof Error ? err.message : "Ocurrió un error al actualizar la contraseña")
       setLoading(false)
     }
