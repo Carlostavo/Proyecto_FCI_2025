@@ -20,8 +20,10 @@ export async function GET(request: NextRequest) {
     }
   }
 
+  const supabase = await createClient()
+
+  // Si viene un código (flujo de sign-up o login tradicional)
   if (code) {
-    const supabase = await createClient()
     const { error } = await supabase.auth.exchangeCodeForSession(code)
     if (!error) {
       // Si es un recovery (reset password), redirigir a la página de cambio de contraseña
@@ -31,9 +33,26 @@ export async function GET(request: NextRequest) {
       return NextResponse.redirect(getRedirectUrl(next))
     } else {
       console.error("[v0] Auth Callback - Error exchanging code:", error.message)
+      return NextResponse.redirect(getRedirectUrl("/auth/login?error=auth_error"))
     }
   }
 
-  // Si hay error, redirigir al login con mensaje de error
+  // Si NO viene código pero SÍ viene type=recovery, significa que Supabase ya estableció la sesión
+  // (esto ocurre cuando Supabase redirige desde /verify después de verificar el email)
+  if (type === "recovery") {
+    // Verificar que la sesión existe
+    const { data: { session } } = await supabase.auth.getSession()
+    if (session) {
+      return NextResponse.redirect(getRedirectUrl("/auth/reset-password?verified=true"))
+    }
+    return NextResponse.redirect(getRedirectUrl("/auth/login?error=auth_error"))
+  }
+
+  // Si hay una sesión activa, ir al next, si no, al login
+  const { data: { session } } = await supabase.auth.getSession()
+  if (session) {
+    return NextResponse.redirect(getRedirectUrl(next))
+  }
+
   return NextResponse.redirect(getRedirectUrl("/auth/login?error=auth_error"))
 }
