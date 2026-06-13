@@ -1,7 +1,5 @@
 "use client"
 
-export const dynamic = 'force-dynamic'
-
 import type React from "react"
 import { createClient } from "@/lib/supabase/client"
 import { AuthShell } from "@/components/auth/auth-shell"
@@ -10,9 +8,9 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { useRouter, useSearchParams } from "next/navigation"
-import { useEffect, useState } from "react"
+import { useEffect, useState, Suspense } from "react"
 
-export default function ResetPasswordPage() {
+function ResetPasswordContent() {
   const [password, setPassword] = useState("")
   const [confirmPassword, setConfirmPassword] = useState("")
   const [error, setError] = useState<string | null>(null)
@@ -196,5 +194,28 @@ export default function ResetPasswordPage() {
         </CardContent>
       </Card>
     </AuthShell>
+  )
+}
+
+export default function ResetPasswordPage() {
+  return (
+    <Suspense
+      fallback={
+        <AuthShell
+          title="Cargando..."
+          subtitle="Por favor espera"
+        >
+          <Card>
+            <CardContent className="pt-6">
+              <div className="text-center text-muted-foreground">
+                Cargando tu solicitud de recuperación...
+              </div>
+            </CardContent>
+          </Card>
+        </AuthShell>
+      }
+    >
+      <ResetPasswordContent />
+    </Suspense>
   )
 }
