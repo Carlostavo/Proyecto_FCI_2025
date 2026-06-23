@@ -4,6 +4,8 @@ import { AppShell } from "@/components/dashboard/app-shell"
 import { Toolbar } from "@/components/dashboard/header"
 import { getPerfilContext } from "@/lib/perfil"
 
+export const dynamic = 'force-dynamic'
+
 export default async function DiagnosticoPage() {
   const ctx = await getPerfilContext()
   if (ctx.rolRaw === "mujer_emprendedora") {
@@ -20,6 +22,5 @@ export default async function DiagnosticoPage() {
       </AppShell>
     )
   }
-
   return <RoleAwareModulePage moduleKey="diagnostico" />
 }

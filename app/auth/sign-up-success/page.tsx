@@ -4,6 +4,8 @@ import { AuthShell } from "@/components/auth/auth-shell"
 import { buttonVariants } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 
+export const dynamic = 'force-dynamic'
+
 export default function SignUpSuccessPage() {
   return (
     <AuthShell title="Revisa tu correo" subtitle="Tu cuenta fue creada correctamente">

@@ -1,7 +1,5 @@
 "use client"
-
 import type React from "react"
-
 import { createClient } from "@/lib/supabase/client"
 import { AuthShell } from "@/components/auth/auth-shell"
 import { Button } from "@/components/ui/button"
@@ -12,19 +10,19 @@ import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useState } from "react"
 
+export const dynamic = 'force-dynamic'
+
 export default function LoginPage() {
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [error, setError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const router = useRouter()
-
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
     const supabase = createClient()
     setIsLoading(true)
     setError(null)
-
     try {
       const { error } = await supabase.auth.signInWithPassword({
         email,
@@ -38,7 +36,6 @@ export default function LoginPage() {
       setIsLoading(false)
     }
   }
-
   return (
     <AuthShell
       title="Iniciar sesión"

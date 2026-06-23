@@ -3,6 +3,8 @@ import ResetPasswordForm from "./reset-password-form"
 import { AuthShell } from "@/components/auth/auth-shell"
 import { Card, CardContent } from "@/components/ui/card"
 
+export const dynamic = 'force-dynamic'
+
 export default function ResetPasswordPage() {
   return (
     <Suspense

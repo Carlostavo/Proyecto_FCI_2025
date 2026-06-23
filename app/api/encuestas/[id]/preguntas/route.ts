@@ -1,10 +1,16 @@
 import { createClient } from "@supabase/supabase-js"
 import { NextRequest, NextResponse } from "next/server"
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-)
+function getSupabaseClient() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+
+  if (!url || !key) {
+    throw new Error("Supabase credentials are not configured")
+  }
+
+  return createClient(url, key)
+}
 
 // POST: Crear pregunta en un bloque
 export async function POST(
@@ -12,6 +18,7 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const supabase = getSupabaseClient()
     const body = await request.json()
     const { bloque_id, pregunta, tipo, opciones, texto_ayuda, requerido, visible_cuando } = body
 

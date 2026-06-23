@@ -1,14 +1,21 @@
 import { createClient } from "@supabase/supabase-js"
 import { NextRequest, NextResponse } from "next/server"
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-)
+function getSupabaseClient() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+
+  if (!url || !key) {
+    throw new Error("Supabase credentials are not configured")
+  }
+
+  return createClient(url, key)
+}
 
 // GET: Obtener todas las encuestas activas
 export async function GET(request: NextRequest) {
   try {
+    const supabase = getSupabaseClient()
     const { data, error } = await supabase
       .from("encuestas")
       .select("*")
@@ -31,6 +38,7 @@ export async function GET(request: NextRequest) {
 // POST: Crear nueva encuesta (administradora)
 export async function POST(request: NextRequest) {
   try {
+    const supabase = getSupabaseClient()
     const body = await request.json()
     const { titulo, descripcion, es_inicial } = body
 

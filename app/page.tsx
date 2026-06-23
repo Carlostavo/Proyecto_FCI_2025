@@ -5,9 +5,10 @@ import { getPerfilContext } from "@/lib/perfil"
 import { getProjectDashboardData } from "@/lib/project-dashboard"
 import { getEntregasUsuario, getModulosPublicados, getTareasCurso } from "@/lib/cursos"
 
+export const dynamic = 'force-dynamic'
+
 export default async function Page() {
   const ctx = await getPerfilContext()
-
   if (ctx.rolRaw === "mujer_emprendedora") {
     const [modulos, tareas, entregas] = await Promise.all([
       getModulosPublicados(),
@@ -25,9 +26,7 @@ export default async function Page() {
       </AppShell>
     )
   }
-
   const dashboardData = await getProjectDashboardData()
-
   return (
     <AppShell>
       <ProjectDashboard data={dashboardData} />

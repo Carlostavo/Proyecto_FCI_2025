@@ -1,5 +1,4 @@
 "use client"
-
 import type React from "react"
 import { createClient } from "@/lib/supabase/client"
 import { AuthShell } from "@/components/auth/auth-shell"
@@ -10,18 +9,18 @@ import { Label } from "@/components/ui/label"
 import Link from "next/link"
 import { useState } from "react"
 
+export const dynamic = 'force-dynamic'
+
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState("")
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
-
   const handleResetPassword = async (e: React.FormEvent) => {
     e.preventDefault()
     const supabase = createClient()
     setIsLoading(true)
     setError(null)
-
     try {
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
         redirectTo: `${window.location.origin}/auth/reset-password`,
@@ -37,7 +36,6 @@ export default function ForgotPasswordPage() {
       setIsLoading(false)
     }
   }
-
   if (success) {
     return (
       <AuthShell
@@ -65,7 +63,6 @@ export default function ForgotPasswordPage() {
       </AuthShell>
     )
   }
-
   return (
     <AuthShell
       title="Recuperar contraseña"

@@ -1,10 +1,16 @@
 import { createClient } from "@supabase/supabase-js"
 import { NextRequest, NextResponse } from "next/server"
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-)
+function getSupabaseClient() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+
+  if (!url || !key) {
+    throw new Error("Supabase credentials are not configured")
+  }
+
+  return createClient(url, key)
+}
 
 // PUT: Actualizar pregunta
 export async function PUT(
@@ -12,6 +18,7 @@ export async function PUT(
   { params }: { params: Promise<{ preguntaId: string }> }
 ) {
   try {
+    const supabase = getSupabaseClient()
     const { preguntaId } = await params
     const body = await request.json()
     const { pregunta, tipo, opciones, texto_ayuda, requerido, visible_cuando, estado } = body

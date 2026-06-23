@@ -3,6 +3,8 @@ import { AuthShell } from "@/components/auth/auth-shell"
 import { Card, CardContent } from "@/components/ui/card"
 import { ConfirmClient } from "./confirm-client"
 
+export const dynamic = 'force-dynamic'
+
 export default function ConfirmPage() {
   return (
     <Suspense

@@ -5,14 +5,13 @@ import { Toolbar } from "@/components/dashboard/header"
 import { getCursos } from "@/lib/cursos"
 import { getPerfilContext } from "@/lib/perfil"
 
-const ROLES_GESTION = new Set(["administradora", "investigadora", "formadora"])
+export const dynamic = 'force-dynamic'
 
+const ROLES_GESTION = new Set(["administradora", "investigadora", "formadora"])
 export default async function DisenoCursosPage() {
   const ctx = await getPerfilContext()
   if (!ctx.rolRaw || !ROLES_GESTION.has(ctx.rolRaw)) redirect("/")
-
   const cursos = await getCursos(true)
-
   return (
     <AppShell>
       <Toolbar

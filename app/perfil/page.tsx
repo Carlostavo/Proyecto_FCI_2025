@@ -3,9 +3,10 @@ import { Toolbar } from "@/components/dashboard/header"
 import { PerfilForm } from "@/components/perfil/perfil-form"
 import { getPerfilContext } from "@/lib/perfil"
 
+export const dynamic = 'force-dynamic'
+
 export default async function PerfilPage() {
   const ctx = await getPerfilContext()
-
   return (
     <AppShell>
       <Toolbar

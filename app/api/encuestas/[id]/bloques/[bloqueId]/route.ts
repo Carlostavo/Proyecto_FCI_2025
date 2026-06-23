@@ -1,10 +1,16 @@
 import { createClient } from "@supabase/supabase-js"
 import { NextRequest, NextResponse } from "next/server"
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-)
+function getSupabaseClient() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+
+  if (!url || !key) {
+    throw new Error("Supabase credentials are not configured")
+  }
+
+  return createClient(url, key)
+}
 
 // PUT: Actualizar bloque
 export async function PUT(
@@ -12,6 +18,7 @@ export async function PUT(
   { params }: { params: Promise<{ bloqueId: string }> }
 ) {
   try {
+    const supabase = getSupabaseClient()
     const { bloqueId } = await params
     const body = await request.json()
     const { titulo, descripcion, estado } = body
@@ -44,6 +51,7 @@ export async function DELETE(
   { params }: { params: Promise<{ bloqueId: string }> }
 ) {
   try {
+    const supabase = getSupabaseClient()
     const { bloqueId } = await params
 
     const { data, error } = await supabase

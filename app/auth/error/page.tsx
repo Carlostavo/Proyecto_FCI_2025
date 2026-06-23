@@ -4,6 +4,8 @@ import { AuthShell } from "@/components/auth/auth-shell"
 import { buttonVariants } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 
+export const dynamic = 'force-dynamic'
+
 export default function AuthErrorPage() {
   return (
     <AuthShell title="Algo salio mal" subtitle="No pudimos completar tu solicitud de autenticacion">

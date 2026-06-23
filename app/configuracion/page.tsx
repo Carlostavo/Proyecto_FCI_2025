@@ -5,10 +5,31 @@ import { getRolActual } from "@/lib/perfil"
 import { getProjectInfo } from "@/lib/project-info"
 import { ConfiguracionClientWrapper } from "@/components/configuracion/configuracion-client-wrapper"
 
+export const dynamic = 'force-dynamic'
+
 export default async function ConfiguracionPage() {
-  const usuarios = await obtenerUsuarios()
-  const rolActual = await getRolActual()
-  const projectInfo = await getProjectInfo()
+  let usuarios: any[] = []
+  let rolActual = null
+  let projectInfo = null
+
+  try {
+    usuarios = await obtenerUsuarios()
+  } catch (err) {
+    console.error("[v0] Error obteniendo usuarios:", err)
+  }
+
+  try {
+    rolActual = await getRolActual()
+  } catch (err) {
+    console.error("[v0] Error obteniendo rol actual:", err)
+  }
+
+  try {
+    projectInfo = await getProjectInfo()
+  } catch (err) {
+    console.error("[v0] Error obteniendo info del proyecto:", err)
+    projectInfo = null
+  }
 
   return (
     <AppShell>
@@ -19,15 +40,15 @@ export default async function ConfiguracionPage() {
       />
       <div className="px-6 pb-8">
         <ConfiguracionClientWrapper
-          usuarios={usuarios.map(u => ({
+          usuarios={usuarios && Array.isArray(usuarios) ? usuarios.map(u => ({
             id: u.id,
             nombre_completo: u.nombre_completo,
             email: u.email,
             rol: u.rol,
             activa: u.activa
-          }))}
+          })) : []}
           initialRol={rolActual}
-          projectInfo={projectInfo}
+          projectInfo={projectInfo || undefined}
         />
       </div>
     </AppShell>

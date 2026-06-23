@@ -3,12 +3,12 @@ import { participantModules } from "@/components/participant/participant-module-
 import { RoleAwareModulePage } from "@/components/roles/role-aware-module-page"
 import { getPerfilContext } from "@/lib/perfil"
 
+export const dynamic = 'force-dynamic'
+
 export default async function CertificadosPage() {
   const ctx = await getPerfilContext()
-
   if (ctx.rolRaw === "mujer_emprendedora") {
     return <ParticipantModulePage {...participantModules.certificados} />
   }
-
   return <RoleAwareModulePage moduleKey="malla" />
 }

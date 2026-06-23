@@ -1,7 +1,5 @@
 "use client"
-
 import type React from "react"
-
 import { createClient } from "@/lib/supabase/client"
 import { AuthShell } from "@/components/auth/auth-shell"
 import { Button } from "@/components/ui/button"
@@ -12,6 +10,8 @@ import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useState } from "react"
 
+export const dynamic = 'force-dynamic'
+
 export default function SignUpPage() {
   const [nombre, setNombre] = useState("")
   const [email, setEmail] = useState("")
@@ -20,19 +20,16 @@ export default function SignUpPage() {
   const [error, setError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const router = useRouter()
-
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault()
     const supabase = createClient()
     setIsLoading(true)
     setError(null)
-
     if (password !== repeatPassword) {
       setError("Las contraseñas no coinciden")
       setIsLoading(false)
       return
     }
-
     try {
       const { error } = await supabase.auth.signUp({
         email,
@@ -53,7 +50,6 @@ export default function SignUpPage() {
       setIsLoading(false)
     }
   }
-
   return (
     <AuthShell title="Crear cuenta" subtitle="Regístrate para acceder a la plataforma de gestión del proyecto FCI">
       <Card>

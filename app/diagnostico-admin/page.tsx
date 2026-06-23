@@ -6,14 +6,14 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { CheckCircle2, Info } from "lucide-react"
 
+export const dynamic = 'force-dynamic'
+
 export default async function DiagnosticoAdminPage() {
   const ctx = await getPerfilContext()
-
   // Solo administradoras pueden acceder
   if (ctx.rolRaw !== "administradora") {
     redirect("/diagnostico")
   }
-
   return (
     <AppShell>
       <Toolbar
@@ -28,7 +28,6 @@ export default async function DiagnosticoAdminPage() {
             La encuesta utiliza la tabla <code className="bg-white px-2 py-1 rounded">cuestionario_limpio_respuestas</code> para almacenar respuestas de forma anónima (sin user_id). Todas las respuestas se guardan automáticamente cuando las emprendedoras completan la encuesta en /diagnostico.
           </AlertDescription>
         </Alert>
-
         <Card>
           <CardHeader>
             <CardTitle>Información de la Encuesta</CardTitle>
@@ -55,7 +54,6 @@ export default async function DiagnosticoAdminPage() {
                 </li>
               </ul>
             </div>
-
             <div>
               <h3 className="font-semibold text-sm text-gray-700 mb-2">Tabla de Almacenamiento</h3>
               <p className="text-sm text-gray-600">
@@ -65,7 +63,6 @@ export default async function DiagnosticoAdminPage() {
                 Contiene 33 campos correspondientes a todas las preguntas de la encuesta.
               </p>
             </div>
-
             <div>
               <h3 className="font-semibold text-sm text-gray-700 mb-2">Campos Clave</h3>
               <ul className="space-y-1 text-sm text-gray-600">
@@ -75,7 +72,6 @@ export default async function DiagnosticoAdminPage() {
                 <li>• Múltiples selecciones se guardan como texto separado por comas</li>
               </ul>
             </div>
-
             <div>
               <h3 className="font-semibold text-sm text-gray-700 mb-2">URLs Relacionadas</h3>
               <ul className="space-y-1 text-sm">
