@@ -1,5 +1,5 @@
 import { RoleAwareModulePage } from "@/components/roles/role-aware-module-page"
-import { InitialSurveyForm } from "@/components/survey/initial-survey-form"
+import { DynamicSurveyForm } from "@/components/survey/dynamic-survey-form"
 import { AppShell } from "@/components/dashboard/app-shell"
 import { Toolbar } from "@/components/dashboard/header"
 import { getPerfilContext } from "@/lib/perfil"
@@ -15,7 +15,7 @@ export default async function DiagnosticoPage() {
           showControls={false}
         />
         <div className="px-6 pb-8">
-          <InitialSurveyForm />
+          <DynamicSurveyForm />
         </div>
       </AppShell>
     )
