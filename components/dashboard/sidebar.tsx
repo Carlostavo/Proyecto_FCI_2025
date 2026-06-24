@@ -24,7 +24,7 @@ import { cn } from "@/lib/utils"
 const navItems = [
   { label: "Dashboard", icon: LayoutDashboard, href: "/", roles: ["all"] },
   { label: "Proyecto", icon: FolderKanban, href: "/proyecto", roles: ["administradora", "investigadora", "formadora", "institucion_aliada"] },
-  { label: "Diagnostico (Encuesta)", icon: ClipboardList, href: "/diagnostico", roles: ["administradora", "investigadora", "mujer_emprendedora"] },
+  { label: "Diagnostico (Encuesta)", icon: ClipboardList, href: "/diagnostico", roles: ["administradora", "investigadora"] },
   { label: "Analitica de Necesidades", icon: LineChart, href: "/analitica", roles: ["administradora", "investigadora", "formadora"] },
   { label: "Prediccion de Cursos", icon: Brain, href: "/prediccion", roles: ["administradora", "investigadora", "formadora"] },
   { label: "Diseno de Cursos", icon: BookOpenCheck, href: "/diseno-cursos", roles: ["administradora", "investigadora", "formadora"] },

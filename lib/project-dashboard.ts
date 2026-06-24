@@ -1,12 +1,18 @@
 import { fallbackProjectDashboardData, type ProjectDashboardData } from "@/lib/project-dashboard-data"
 import { getCursos, type Curso } from "@/lib/cursos"
 import { getProjectInfo } from "@/lib/project-info"
+import { getProductionDashboardData } from "@/lib/scientific-production"
 import { createClient } from "@/lib/supabase/server"
 
 type DashboardRow = {
   fuente: "csv" | "encuesta"
   parroquia?: string | null
+  ubicacion?: string | null
+  sector_ubicacion?: string | null
+  antiguedad_emprendimiento?: string | null
   sector_economico?: string | null
+  ingreso_mensual?: string | null
+  nivel_instruccion?: string | null
   etnia?: string | null
   modalidad_preferida?: string | null
   interes_programa?: string | null
@@ -29,6 +35,7 @@ type DashboardRow = {
   usa_pagos_digitales?: string | null
   dificultad_tecnologia?: string | null
   incorpora_cultura?: string | null
+  origen_conocimiento_cultural?: string | null
   integra_cultura?: string | null
   participa_asociaciones?: string | null
   participa_capacitaciones?: string | null
@@ -84,11 +91,39 @@ function percent(count: number, total: number) {
   return Math.round((count / total) * 100)
 }
 
-function yesScore(value: string | null | undefined) {
+function answerScore(key: keyof DashboardRow, value: string | null | undefined): number | null {
   const normalized = normalize(value)
-  if (normalized.includes("si")) return 100
-  if (normalized.includes("a veces") || normalized.includes("un poco")) return 50
-  return 0
+  if (!normalized) return null
+
+  if (key === "ingreso_mensual") {
+    if (normalized.includes("1000")) return 100
+    if (normalized.includes("600")) return 80
+    if (normalized.includes("400")) return 60
+    if (normalized.includes("200")) return 40
+    return 20
+  }
+  if (key === "nivel_instruccion") {
+    if (normalized.includes("postgrado")) return 100
+    if (normalized.includes("superior")) return 80
+    if (normalized.includes("tecn")) return 60
+    if (normalized.includes("secund")) return 40
+    return 20
+  }
+  if (key === "dificultad_tecnologia") {
+    if (includesAny(value, ["ninguna", "no he tenido", "sin dificultad"])) return 100
+    if (includesAny(value, ["a veces", "poca" ])) return 50
+    return 20
+  }
+  if (key === "origen_conocimiento_cultural") {
+    if (normalized.includes("copia")) return 0
+    if (includesAny(value, ["tradicion", "familia", "inspiracion", "ancestral"])) return 100
+    return 50
+  }
+
+  if (includesAny(value, ["no", "ninguno", "solo espero", "solo efectivo", "intuicion"])) return 0
+  if (includesAny(value, ["a veces", "parcial", "en proceso", "restriccion", "me gustaria"])) return 50
+  if (includesAny(value, ["si", "activa", "aplicacion", "software", "costo +", "muy importante"])) return 100
+  return 50
 }
 
 function needsSupport(value: string | null | undefined) {
@@ -166,10 +201,10 @@ function calculateDashboard(rows: DashboardRow[]): ProjectDashboardData {
       needsSupport(row.dificultad_tecnologia),
   ).length
 
-  const avg = (...values: number[]) => Math.round(values.reduce((acc, value) => acc + value, 0) / values.length)
   const score = (keys: (keyof DashboardRow)[]) => {
-    if (!total) return 0
-    return Math.round(rows.reduce((acc, row) => acc + yesScore(firstValue(row, keys)), 0) / total)
+    const values = rows.flatMap((row) => keys.map((key) => answerScore(key, row[key])).filter((value): value is number => value !== null))
+    if (!values.length) return 0
+    return Math.round(values.reduce((acc, value) => acc + value, 0) / values.length)
   }
 
   return {
@@ -187,11 +222,11 @@ function calculateDashboard(rows: DashboardRow[]): ProjectDashboardData {
       { necesidad: "Redes de apoyo", valor: percent(redesApoyo, total) },
     ].sort((a, b) => b.valor - a.valor),
     competencias: [
-      { competencia: "Digital", valor: avg(score(["dispositivo_internet"]), score(["usa_apps_digitales"]), score(["usa_pagos_digitales"])) },
-      { competencia: "Comercial", valor: avg(score(["promocion_negocio", "promociona_negocio"]), score(["usa_sugerencias_clientes", "buena_atencion", "adapta_productos"])) },
-      { competencia: "Gestion", valor: avg(score(["planifica_metas", "organiza_metas_tareas"]), score(["usa_sugerencias_clientes", "adapta_productos"])) },
-      { competencia: "Innovacion", valor: avg(score(["incorpora_cultura", "integra_cultura"]), score(["participa_asociaciones", "participa_redes"])) },
-      { competencia: "Financiera", valor: avg(score(["control_dinero", "registra_compras_ventas"]), score(["reinvierte_ganancias"]), score(["define_precios_costos"])) },
+      { competencia: "Financiera", valor: score(["ingreso_mensual", "control_dinero", "reinvierte_ganancias", "define_precios_costos"]) },
+      { competencia: "Digital", valor: score(["dispositivo_internet", "usa_apps_digitales", "usa_pagos_digitales", "dificultad_tecnologia"]) },
+      { competencia: "Comercial", valor: score(["promocion_negocio", "usa_sugerencias_clientes"]) },
+      { competencia: "Innovacion", valor: score(["etnia", "incorpora_cultura", "origen_conocimiento_cultural", "participa_asociaciones"]) },
+      { competencia: "Gestion", valor: score(["parroquia", "sector_ubicacion", "antiguedad_emprendimiento", "sector_economico", "nivel_instruccion", "situacion_formalizacion", "planifica_metas", "interes_programa", "modalidad_preferida"]) },
     ],
     diagnostico: {
       respuestas: total,
@@ -211,7 +246,7 @@ async function getCsvRows() {
   const { data, error } = await supabase
     .from("cuestionario_limpio_respuestas")
     .select(
-      "parroquia, sector_economico, situacion_formalizacion, control_dinero, planifica_metas, reinvierte_ganancias, define_precios_costos, promocion_negocio, usa_sugerencias_clientes, dispositivo_internet, usa_apps_digitales, usa_pagos_digitales, dificultad_tecnologia, incorpora_cultura, participa_asociaciones, interes_programa, modalidad_preferida, etnia",
+      "ubicacion, parroquia, sector_ubicacion, antiguedad_emprendimiento, sector_economico, ingreso_mensual, nivel_instruccion, etnia, situacion_formalizacion, control_dinero, planifica_metas, reinvierte_ganancias, define_precios_costos, promocion_negocio, usa_sugerencias_clientes, dispositivo_internet, usa_apps_digitales, usa_pagos_digitales, dificultad_tecnologia, incorpora_cultura, origen_conocimiento_cultural, participa_asociaciones, interes_programa, modalidad_preferida",
     )
     .limit(5000)
 
@@ -219,64 +254,36 @@ async function getCsvRows() {
   return (data as Omit<DashboardRow, "fuente">[]).map((row) => ({ ...row, fuente: "csv" as const }))
 }
 
-async function getEncuestaRows() {
+async function getCsvCount() {
   const supabase = await createClient()
-  const { data: encuestas, error } = await supabase
-    .from("encuestas_iniciales")
-    .select("id")
-    .limit(5000)
-
-  if (error || !encuestas?.length) return []
-
-  const ids = encuestas.map((item) => item.id as string)
-  const rows = new Map<string, DashboardRow>()
-  for (const id of ids) rows.set(id, { fuente: "encuesta" })
-
-  const mergeTable = async <T extends Record<string, unknown>>(table: string, columns: string) => {
-    const { data } = await supabase.from(table).select(`id_encuesta, ${columns}`).in("id_encuesta", ids)
-    for (const item of ((data ?? []) as unknown as T[])) {
-      const id = item.id_encuesta as string
-      const current = rows.get(id)
-      if (current) rows.set(id, { ...current, ...(item as Partial<DashboardRow>) })
-    }
-  }
-
-  await Promise.all([
-    mergeTable("encuesta_datos_sociodemograficos", "parroquia, autoidentificacion_cultural"),
-    mergeTable("encuesta_informacion_emprendimiento", "sector_principal"),
-    mergeTable("encuesta_gestion_empresarial", "tiene_ruc_permisos, paga_impuestos_permisos, registra_compras_ventas, organiza_metas_tareas"),
-    mergeTable("encuesta_finanzas", "ahorra_reinvierte, registra_dinero, define_precios_costos"),
-    mergeTable("encuesta_marketing_ventas", "promociona_negocio, buena_atencion, adapta_productos, integra_cultura"),
-    mergeTable("encuesta_tecnologia_digitalizacion", "dispositivo_internet, usa_apps_digitales, usa_pagos_digitales, dificultad_tecnologia"),
-    mergeTable("encuesta_capital_social_redes", "participa_capacitaciones, participa_redes"),
-  ])
-
-  return [...rows.values()].map((row) => ({
-    ...row,
-    etnia: row.etnia ?? (row as { autoidentificacion_cultural?: string | null }).autoidentificacion_cultural,
-    sector_economico: row.sector_economico ?? (row as { sector_principal?: string | null }).sector_principal,
-    control_dinero: row.control_dinero ?? (row as { registra_dinero?: string | null }).registra_dinero,
-    planifica_metas: row.planifica_metas ?? row.organiza_metas_tareas,
-    promocion_negocio: row.promocion_negocio ?? row.promociona_negocio,
-    incorpora_cultura: row.incorpora_cultura ?? row.integra_cultura,
-    participa_asociaciones: row.participa_asociaciones ?? row.participa_redes,
-  }))
+  const { count } = await supabase
+    .from("cuestionario_limpio_respuestas")
+    .select("id", { count: "exact", head: true })
+  return count ?? 0
 }
 
 export async function getProjectDashboardData(): Promise<ProjectDashboardData> {
-  const [csvRows, encuestaRows, projectInfo, cursos] = await Promise.all([
+  const [csvRows, csvCount, projectInfo, cursos, production] = await Promise.all([
     getCsvRows(),
-    getEncuestaRows(),
+    getCsvCount(),
     getProjectInfo(),
     getCursos(true),
+    getProductionDashboardData(),
   ])
-  const rows = [...csvRows, ...encuestaRows]
+  const rows = csvRows
   const courseStats = calculateCourseStats(cursos)
 
   if (rows.length === 0) {
     return {
       ...fallbackProjectDashboardData,
       cursos: courseStats,
+      produccion: production.resumen,
+      produccionPorInvestigador: production.investigadores,
+      validacion: {
+        encuestadas: csvCount,
+        meta: csvCount,
+        porcentaje: csvCount ? 100 : 0,
+      },
       proyecto: {
         ...fallbackProjectDashboardData.proyecto,
         inicio: projectInfo.fechaInicio,
@@ -290,6 +297,13 @@ export async function getProjectDashboardData(): Promise<ProjectDashboardData> {
   return {
     ...dashboard,
     cursos: courseStats,
+    produccion: production.resumen,
+    produccionPorInvestigador: production.investigadores,
+    validacion: {
+      encuestadas: csvCount,
+      meta: csvCount,
+      porcentaje: csvCount ? 100 : 0,
+    },
     proyecto: {
       ...dashboard.proyecto,
       inicio: projectInfo.fechaInicio,
