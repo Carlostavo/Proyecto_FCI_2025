@@ -79,6 +79,8 @@ type DashboardCardData = {
   color: string
   progress?: number
   footer: string
+  startDate?: string
+  endDate?: string
 }
 
 function ChartFilter({
@@ -131,6 +133,8 @@ function DashboardCard({
   color,
   progress,
   footer,
+  startDate,
+  endDate,
 }: DashboardCardData) {
   return (
     <Card className="p-5">
@@ -145,7 +149,20 @@ function DashboardCard({
         </div>
       </div>
       {progress !== undefined ? <Progress value={progress} className="mt-5" /> : <div className="mt-5 border-t border-border" />}
-      <p className={cn("mt-4 text-sm font-medium", color)}>{footer}</p>
+      {startDate && endDate ? (
+        <div className="mt-4 flex items-start justify-between gap-4 text-sm">
+          <div className="min-w-0">
+            <p className={cn("font-medium", color)}>Fecha inicio</p>
+            <p className="mt-1 text-foreground">{startDate}</p>
+          </div>
+          <div className="min-w-0 text-right">
+            <p className={cn("font-medium", color)}>Fecha fin</p>
+            <p className="mt-1 text-foreground">{endDate}</p>
+          </div>
+        </div>
+      ) : (
+        <p className={cn("mt-4 text-sm font-medium", color)}>{footer}</p>
+      )}
     </Card>
   )
 }
@@ -159,7 +176,9 @@ function getTopCards(data: ProjectDashboardData): DashboardCardData[] {
       icon: TrendingUp,
       color: "text-primary",
       progress: data.proyecto.avance,
-      footer: `Fecha inicio ${data.proyecto.inicio}`,
+      footer: "",
+      startDate: data.proyecto.inicio,
+      endDate: data.proyecto.fin,
     },
     {
       title: "Cursos Diseñados",

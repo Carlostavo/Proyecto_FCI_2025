@@ -31,6 +31,16 @@ export default function LoginPage() {
         password,
       })
       if (error) throw error
+      const { data: sessionData } = await supabase.auth.getSession()
+      const userId = sessionData.session?.user.id
+      if (userId) {
+        fetch("/api/login-history", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ userId, ruta: "/" }),
+          keepalive: true,
+        }).catch(() => null)
+      }
       router.push("/")
     } catch (error: unknown) {
       setError(error instanceof Error ? error.message : "Ocurrió un error al iniciar sesión")

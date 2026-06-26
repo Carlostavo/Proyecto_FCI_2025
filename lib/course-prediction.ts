@@ -1,4 +1,4 @@
-import { createClient } from "@/lib/supabase/server"
+﻿import { createClient } from "@/lib/supabase/server"
 
 export type CoursePrediction = {
   id: string
@@ -39,11 +39,13 @@ export async function getCoursePredictions(): Promise<CoursePrediction[]> {
 
   const rows = error ? [] : (data as SurveyRow[])
   const count = rows.length
+
   const baseGap = gap(rows, [
     (row) => weak(row.antiguedad_emprendimiento, ["menos de 1", "1-3"]),
     (row) => weak(row.ingreso_mensual, ["100-199", "200-399"]),
     (row) => weak(row.nivel_instruccion, ["primaria", "secundaria"]),
   ])
+
   const financeGap = gap(rows, [
     (row) => weak(row.situacion_formalizacion, ["no", "aun", "en proceso"]),
     (row) => weak(row.control_dinero, ["no", "a veces"]),
@@ -51,6 +53,7 @@ export async function getCoursePredictions(): Promise<CoursePrediction[]> {
     (row) => weak(row.reinvierte_ganancias, ["no", "a veces"]),
     (row) => weak(row.define_precios_costos, ["no", "a veces", "intuicion"]),
   ])
+
   const digitalGap = gap(rows, [
     (row) => weak(row.promocion_negocio, ["solo espero", "no"]),
     (row) => weak(row.usa_sugerencias_clientes, ["no", "a veces"]),
@@ -59,26 +62,132 @@ export async function getCoursePredictions(): Promise<CoursePrediction[]> {
     (row) => weak(row.usa_pagos_digitales, ["no", "a veces", "solo efectivo"]),
     (row) => !weak(row.dificultad_tecnologia, ["ninguna", "no he tenido", "sin dificultad"]),
   ])
+
   const cultureGap = gap(rows, [
     (row) => weak(row.incorpora_cultura, ["no", "a veces", "parcial"]),
     (row) => weak(row.origen_conocimiento_cultural, ["no", "copia"]),
     (row) => weak(row.participa_asociaciones, ["no", "me gustaria"]),
   ])
+
   const participationGap = gap(rows, [
     (row) => weak(row.interes_programa, ["no", "restriccion", "a veces"]),
     (row) => !normalize(row.modalidad_preferida),
   ])
 
-  return [
-    { id: "base-modelo", bloque: "Información base del negocio", numeroBloque: 1, titulo: "Modelo de negocio y propuesta de valor", descripcion: "Define clientes, propuesta de valor, canales, recursos y fuentes de ingreso para emprendimientos en etapa temprana.", brecha: baseGap, respuestas: count },
-    { id: "base-crecimiento", bloque: "Información base del negocio", numeroBloque: 1, titulo: "Plan de crecimiento para microemprendimientos", descripcion: "Convierte el diagnóstico del negocio en metas medibles de ventas, capacidad productiva y sostenibilidad.", brecha: baseGap, respuestas: count },
-    { id: "finanzas-control", bloque: "Gestión y finanzas", numeroBloque: 2, titulo: "Control financiero y flujo de caja", descripcion: "Registro práctico de ingresos, gastos, utilidad, ahorro y reinversión para tomar decisiones con datos.", brecha: financeGap, respuestas: count },
-    { id: "finanzas-precios", bloque: "Gestión y finanzas", numeroBloque: 2, titulo: "Costos, precios y formalización del negocio", descripcion: "Calcula costos reales y precios rentables mientras organiza RUC, permisos y obligaciones básicas.", brecha: financeGap, respuestas: count },
-    { id: "digital-ventas", bloque: "Marketing y tecnología", numeroBloque: 3, titulo: "Ventas digitales con WhatsApp y redes sociales", descripcion: "Crea catálogos, contenido comercial y procesos de atención que conviertan contactos en ventas.", brecha: digitalGap, respuestas: count },
-    { id: "digital-pagos", bloque: "Marketing y tecnología", numeroBloque: 3, titulo: "Herramientas digitales y pagos seguros", descripcion: "Usa aplicaciones de gestión, pagos digitales y buenas prácticas de seguridad para operar el negocio.", brecha: digitalGap, respuestas: count },
-    { id: "cultura-marca", bloque: "Cultura e identidad", numeroBloque: 4, titulo: "Identidad cultural aplicada a la marca", descripcion: "Transforma saberes, historias y elementos culturales en una marca autentica y respetuosa.", brecha: cultureGap, respuestas: count },
-    { id: "cultura-redes", bloque: "Cultura e identidad", numeroBloque: 4, titulo: "Asociatividad y comercialización comunitaria", descripcion: "Fortalece redes entre emprendedoras, alianzas, ferias y canales colectivos de comercialización.", brecha: cultureGap, respuestas: count },
-    { id: "participacion-ruta", bloque: "Participación en el programa", numeroBloque: 5, titulo: "Ruta flexible de aprendizaje emprendedor", descripcion: "Organiza el aprendizaje por metas, modalidad y disponibilidad para sostener la participación en el programa.", brecha: participationGap, respuestas: count },
-    { id: "participacion-liderazgo", bloque: "Participación en el programa", numeroBloque: 5, titulo: "Liderazgo, autonomía y redes de apoyo", descripcion: "Desarrolla liderazgo personal, colaboración y estrategias para superar restricciones de participación.", brecha: participationGap, respuestas: count },
+  const items: CoursePrediction[] = [
+    {
+      id: "base-modelo",
+      bloque: "Información base del negocio",
+      numeroBloque: 1,
+      titulo: "Diseño de modelo de negocio para emprendedoras",
+      descripcion: "Aterriza el negocio en clientas, propuesta de valor, productos, canales y fuentes de ingreso con ejercicios prácticos.",
+      brecha: baseGap,
+      respuestas: count,
+    },
+    {
+      id: "base-crecimiento",
+      bloque: "Información base del negocio",
+      numeroBloque: 1,
+      titulo: "Plan de crecimiento y metas del emprendimiento",
+      descripcion: "Convierte la situación actual en metas claras de ventas, producción y sostenibilidad para el corto y mediano plazo.",
+      brecha: baseGap,
+      respuestas: count,
+    },
+    {
+      id: "finanzas-control",
+      bloque: "Gestión y finanzas",
+      numeroBloque: 2,
+      titulo: "Control de ingresos, gastos y flujo de caja",
+      descripcion: "Refuerza el registro simple del dinero para saber cuánto entra, cuánto sale y cuánto realmente gana el negocio.",
+      brecha: financeGap,
+      respuestas: count,
+    },
+    {
+      id: "finanzas-precios",
+      bloque: "Gestión y finanzas",
+      numeroBloque: 2,
+      titulo: "Costos, precios y formalización básica",
+      descripcion: "Aprende a calcular precios, reconocer costos, separar ganancia y ordenar pasos básicos de formalización.",
+      brecha: financeGap,
+      respuestas: count,
+    },
+    {
+      id: "digital-basico",
+      bloque: "Marketing y tecnología",
+      numeroBloque: 3,
+      titulo: "Uso de WhatsApp Business y catálogo digital",
+      descripcion: "Organiza productos, mensajes frecuentes y atención a clientas para vender mejor desde el celular.",
+      brecha: digitalGap,
+      respuestas: count,
+    },
+    {
+      id: "digital-redes",
+      bloque: "Marketing y tecnología",
+      numeroBloque: 3,
+      titulo: "Promoción digital para microemprendimientos",
+      descripcion: "Crea publicaciones, historias y contenido sencillo para redes sociales enfocado en visibilidad y ventas.",
+      brecha: digitalGap,
+      respuestas: count,
+    },
+    {
+      id: "digital-herramientas",
+      bloque: "Marketing y tecnología",
+      numeroBloque: 3,
+      titulo: "Herramientas digitales para organizar el negocio",
+      descripcion: "Practica aplicaciones para pedidos, pagos, organización y seguridad digital sin complicaciones técnicas.",
+      brecha: digitalGap,
+      respuestas: count,
+    },
+    {
+      id: "digital-pagos",
+      bloque: "Marketing y tecnología",
+      numeroBloque: 3,
+      titulo: "Pagos digitales y cobros seguros",
+      descripcion: "Refuerza el uso de transferencias, pagos QR y opciones seguras para cobrar y pagar con confianza.",
+      brecha: digitalGap,
+      respuestas: count,
+    },
+    {
+      id: "cultura-marca",
+      bloque: "Cultura e identidad",
+      numeroBloque: 4,
+      titulo: "Identidad cultural aplicada a productos y marca",
+      descripcion: "Convierte elementos culturales en una propuesta auténtica que comunique valor sin perder identidad.",
+      brecha: cultureGap,
+      respuestas: count,
+    },
+    {
+      id: "cultura-redes",
+      bloque: "Cultura e identidad",
+      numeroBloque: 4,
+      titulo: "Redes comunitarias y comercialización colectiva",
+      descripcion: "Fortalece alianzas, ferias y redes de apoyo para vender en conjunto y ampliar oportunidades.",
+      brecha: cultureGap,
+      respuestas: count,
+    },
+    {
+      id: "participacion-ruta",
+      bloque: "Participación en el programa",
+      numeroBloque: 5,
+      titulo: "Ruta flexible de aprendizaje emprendedor",
+      descripcion: "Organiza la participación por horarios, modalidad y ritmo de avance para sostener la formación.",
+      brecha: participationGap,
+      respuestas: count,
+    },
+    {
+      id: "participacion-liderazgo",
+      bloque: "Participación en el programa",
+      numeroBloque: 5,
+      titulo: "Liderazgo y autonomía para continuar aprendiendo",
+      descripcion: "Impulsa confianza, constancia y redes de apoyo para mantener el negocio y aprovechar la capacitación.",
+      brecha: participationGap,
+      respuestas: count,
+    },
   ]
+
+  return items.sort((a, b) => {
+    if (b.brecha !== a.brecha) return b.brecha - a.brecha
+    if (b.numeroBloque !== a.numeroBloque) return a.numeroBloque - b.numeroBloque
+    return a.titulo.localeCompare(b.titulo)
+  })
 }

@@ -6,9 +6,50 @@ export type Curso = {
   descripcion: string
   enlace: string | null
   visible: boolean
+  id_encargado: string | null
+  encargado?: {
+    id: string
+    nombre_completo: string | null
+    email: string | null
+  } | null
+  participantes_count?: number
   estado: "borrador" | "en_diseno" | "en_validacion" | "completado"
   fecha_creacion: string
   fecha_actualizacion: string
+}
+
+export type CursoUsuario = {
+  id: string
+  nombre_completo: string | null
+  email: string | null
+  rol: string
+}
+
+export type CursoParticipante = {
+  id: string
+  id_curso: string
+  id_participante: string
+  activo: boolean
+  fecha_asignacion: string
+  participante: {
+    id: string
+    nombre_completo: string | null
+    email: string | null
+  } | null
+}
+
+type CursoRaw = Omit<Curso, "encargado" | "participantes_count"> & {
+  encargado?: Curso["encargado"] | Curso["encargado"][]
+  curso_participantes?: { count: number }[]
+}
+
+function normalizeCurso(curso: CursoRaw): Curso {
+  const encargado = Array.isArray(curso.encargado) ? (curso.encargado[0] ?? null) : (curso.encargado ?? null)
+  return {
+    ...curso,
+    encargado,
+    participantes_count: curso.curso_participantes?.[0]?.count ?? 0,
+  }
 }
 
 export type TareaCurso = {
@@ -76,14 +117,14 @@ export async function getCursos(incluirOcultos = false): Promise<Curso[]> {
   const supabase = await createClient()
   let query = supabase
     .from("cursos")
-    .select("id, titulo, descripcion, enlace, visible, estado, fecha_creacion, fecha_actualizacion")
+    .select("id, titulo, descripcion, enlace, visible, id_encargado, estado, fecha_creacion, fecha_actualizacion, encargado:perfiles_usuario!cursos_id_encargado_fkey(id, nombre_completo, email), curso_participantes(count)")
     .order("fecha_creacion", { ascending: false })
 
   if (!incluirOcultos) query = query.eq("visible", true)
 
   const { data, error } = await query
   if (error || !data) return []
-  return data as Curso[]
+  return (data as unknown as CursoRaw[]).map(normalizeCurso)
 }
 
 export async function getTareasCurso(incluirOcultas = false): Promise<TareaCurso[]> {
@@ -105,6 +146,36 @@ export async function getTareasCurso(incluirOcultas = false): Promise<TareaCurso
       vencida: new Date(tarea.fecha_limite).getTime() < Date.now(),
       dias_restantes: Math.ceil((new Date(tarea.fecha_limite).getTime() - Date.now()) / 86_400_000),
     }))
+}
+
+export async function getUsuariosAsignablesCurso(): Promise<{ encargados: CursoUsuario[]; emprendedoras: CursoUsuario[] }> {
+  const supabase = await createClient()
+  const select = "id, nombre_completo, email, rol"
+  const { data, error } = await supabase
+    .from("v_perfiles_usuario_con_rol")
+    .select(select)
+    .eq("cuenta_activa", true)
+    .order("nombre_completo", { ascending: true })
+
+  if (error || !data) return { encargados: [], emprendedoras: [] }
+  const usuarios = data as CursoUsuario[]
+  return {
+    encargados: usuarios.filter((usuario) => ["administradora", "investigadora", "formadora"].includes(usuario.rol)),
+    emprendedoras: usuarios.filter((usuario) => usuario.rol === "mujer_emprendedora"),
+  }
+}
+
+export async function getParticipantesCurso(idCurso: string): Promise<CursoParticipante[]> {
+  const supabase = await createClient()
+  const { data, error } = await supabase
+    .from("curso_participantes")
+    .select("id, id_curso, id_participante, activo, fecha_asignacion, participante:perfiles_usuario!curso_participantes_id_participante_fkey(id, nombre_completo, email)")
+    .eq("id_curso", idCurso)
+    .eq("activo", true)
+    .order("fecha_asignacion", { ascending: false })
+
+  if (error || !data) return []
+  return data as unknown as CursoParticipante[]
 }
 
 export async function getEntregasUsuario(): Promise<EntregaTarea[]> {
@@ -141,13 +212,13 @@ export async function getCurso(id: string, incluirOculto = false): Promise<Curso
   const supabase = await createClient()
   let query = supabase
     .from("cursos")
-    .select("id, titulo, descripcion, enlace, visible, estado, fecha_creacion, fecha_actualizacion")
+    .select("id, titulo, descripcion, enlace, visible, id_encargado, estado, fecha_creacion, fecha_actualizacion, encargado:perfiles_usuario!cursos_id_encargado_fkey(id, nombre_completo, email)")
     .eq("id", id)
 
   if (!incluirOculto) query = query.eq("visible", true)
   const { data, error } = await query.maybeSingle()
   if (error || !data) return null
-  return data as Curso
+  return normalizeCurso(data as unknown as CursoRaw)
 }
 
 export async function getModulosCurso(idCurso: string, incluirOcultos = false): Promise<ModuloCurso[]> {
@@ -175,6 +246,60 @@ export async function getModulosPublicados(): Promise<ModuloCurso[]> {
 
   if (error || !data) return []
   return (data as unknown as Array<ModuloCurso & { curso?: { visible: boolean } }>).map(({ curso: _curso, ...modulo }) => modulo)
+}
+
+export async function getCursosAsignadosUsuario(): Promise<Curso[]> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return []
+
+  const { data, error } = await supabase
+    .from("curso_participantes")
+    .select("curso:cursos!inner(id, titulo, descripcion, enlace, visible, id_encargado, estado, fecha_creacion, fecha_actualizacion, encargado:perfiles_usuario!cursos_id_encargado_fkey(id, nombre_completo, email))")
+    .eq("id_participante", user.id)
+    .eq("activo", true)
+    .eq("curso.visible", true)
+    .order("fecha_asignacion", { ascending: false })
+
+  if (error || !data) return []
+  return (data as unknown as Array<{ curso: CursoRaw | null }>).map((item) => item.curso ? normalizeCurso(item.curso) : null).filter((curso): curso is Curso => !!curso)
+}
+
+export async function getModulosAsignadosUsuario(): Promise<ModuloCurso[]> {
+  const cursos = await getCursosAsignadosUsuario()
+  if (cursos.length === 0) return []
+  const supabase = await createClient()
+  const { data, error } = await supabase
+    .from("modulos_curso")
+    .select("id, id_curso, titulo, contenido_html, orden, visible")
+    .in("id_curso", cursos.map((curso) => curso.id))
+    .eq("visible", true)
+    .order("orden", { ascending: true })
+
+  if (error || !data) return []
+  return data as ModuloCurso[]
+}
+
+export async function getTareasAsignadasUsuario(): Promise<TareaCurso[]> {
+  const cursos = await getCursosAsignadosUsuario()
+  if (cursos.length === 0) return []
+  const tareas = await getTareasCurso(false)
+  const ids = new Set(cursos.map((curso) => curso.id))
+  return tareas.filter((tarea) => ids.has(tarea.id_curso))
+}
+
+export async function usuarioTieneCursoAsignado(idCurso: string): Promise<boolean> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return false
+  const { data } = await supabase
+    .from("curso_participantes")
+    .select("id")
+    .eq("id_curso", idCurso)
+    .eq("id_participante", user.id)
+    .eq("activo", true)
+    .maybeSingle()
+  return !!data
 }
 
 export async function getTareasPorCurso(idCurso: string, incluirOcultas = false): Promise<TareaCurso[]> {

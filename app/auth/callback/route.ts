@@ -1,5 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
+import { createAdminClient } from "@/lib/supabase/admin"
 
 export async function GET(request: NextRequest) {
   const { searchParams, origin } = request.nextUrl
@@ -21,6 +22,27 @@ export async function GET(request: NextRequest) {
     const { error } = await supabase.auth.exchangeCodeForSession(code)
 
     if (!error) {
+      const { data: sessionData } = await supabase.auth.getSession()
+      const userId = sessionData.session?.user.id
+      if (userId && type !== "recovery") {
+        const admin = createAdminClient()
+        const { data: perfil } = await admin
+          .from("v_perfiles_usuario_con_rol")
+          .select("id, nombre_completo, email, rol")
+          .eq("id", userId)
+          .maybeSingle()
+
+        const { data: userData } = await admin.auth.admin.getUserById(userId)
+        await admin.from("historial_ingresos").insert({
+          id_usuario: userId,
+          nombre_usuario: perfil?.nombre_completo ?? userData.user?.user_metadata?.nombre_completo ?? null,
+          email_usuario: perfil?.email ?? userData.user?.email ?? null,
+          rol_usuario: perfil?.rol ?? null,
+          ruta: next,
+          user_agent: request.headers.get("user-agent"),
+        })
+        await admin.from("perfiles_usuario").update({ ultimo_acceso: new Date().toISOString() }).eq("id", userId)
+      }
       if (type === "recovery" || type === "invite") {
         return NextResponse.redirect(getRedirectUrl("/auth/reset-password?verified=true"))
       }

@@ -15,12 +15,23 @@ export function ConfiguracionClientWrapper({
   usuarios,
   initialRol,
   projectInfo,
+  historialIngresos,
 }: {
   usuarios: Usuario[]
   initialRol: string | null
   projectInfo: ProjectInfo
+  historialIngresos: Array<{
+    id: string
+    id_usuario: string
+    nombre_usuario: string | null
+    email_usuario: string | null
+    rol_usuario: string | null
+    fecha_ingreso: string
+    ruta: string | null
+    user_agent: string | null
+  }>
 }) {
   const esAdmin = initialRol === "administradora"
 
-  return <ConfiguracionTabs usuarios={usuarios} esAdmin={esAdmin} projectInfo={projectInfo} />
+  return <ConfiguracionTabs usuarios={usuarios} esAdmin={esAdmin} projectInfo={projectInfo} historialIngresos={historialIngresos} />
 }

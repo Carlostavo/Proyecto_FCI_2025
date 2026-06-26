@@ -40,6 +40,8 @@ ALTER TABLE public.cursos ALTER COLUMN enlace DROP NOT NULL;
 ALTER TABLE public.cursos ALTER COLUMN enlace SET DEFAULT NULL;
 ALTER TABLE public.cursos
   ADD COLUMN IF NOT EXISTS estado TEXT NOT NULL DEFAULT 'en_diseno';
+ALTER TABLE public.cursos
+  ADD COLUMN IF NOT EXISTS id_encargado UUID REFERENCES public.perfiles_usuario(id) ON DELETE SET NULL;
 ALTER TABLE public.cursos DROP CONSTRAINT IF EXISTS cursos_estado_check;
 ALTER TABLE public.cursos ADD CONSTRAINT cursos_estado_check
   CHECK (estado IN ('borrador', 'en_diseno', 'en_validacion', 'completado'));
@@ -67,6 +69,16 @@ CREATE TABLE IF NOT EXISTS public.calificaciones_entrega (
   fecha_calificacion TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
+CREATE TABLE IF NOT EXISTS public.curso_participantes (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  id_curso UUID NOT NULL REFERENCES public.cursos(id) ON DELETE CASCADE,
+  id_participante UUID NOT NULL REFERENCES public.perfiles_usuario(id) ON DELETE CASCADE,
+  fecha_asignacion TIMESTAMPTZ NOT NULL DEFAULT now(),
+  asignado_por UUID REFERENCES public.perfiles_usuario(id) ON DELETE SET NULL,
+  activo BOOLEAN NOT NULL DEFAULT TRUE,
+  UNIQUE (id_curso, id_participante)
+);
+
 CREATE INDEX IF NOT EXISTS tareas_curso_fecha_limite_idx
   ON public.tareas_curso (fecha_limite);
 
@@ -81,12 +93,19 @@ CREATE INDEX IF NOT EXISTS modulos_curso_orden_idx
 
 CREATE INDEX IF NOT EXISTS tareas_curso_modulo_idx
   ON public.tareas_curso (id_modulo);
+CREATE INDEX IF NOT EXISTS cursos_id_encargado_idx
+  ON public.cursos (id_encargado);
+CREATE INDEX IF NOT EXISTS curso_participantes_curso_idx
+  ON public.curso_participantes (id_curso);
+CREATE INDEX IF NOT EXISTS curso_participantes_participante_idx
+  ON public.curso_participantes (id_participante);
 
 ALTER TABLE public.cursos ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.tareas_curso ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.entregas_tarea ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.modulos_curso ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.calificaciones_entrega ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.curso_participantes ENABLE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS "perfiles_select_encargados_formacion" ON public.perfiles_usuario;
 CREATE POLICY "perfiles_select_encargados_formacion" ON public.perfiles_usuario
@@ -96,8 +115,15 @@ CREATE POLICY "perfiles_select_encargados_formacion" ON public.perfiles_usuario
 
 DROP POLICY IF EXISTS "cursos_select" ON public.cursos;
 CREATE POLICY "cursos_select" ON public.cursos
-  FOR SELECT USING (
-    visible OR public.get_my_rol() IN ('administradora', 'investigadora', 'formadora')
+  FOR SELECT TO authenticated USING (
+    public.get_my_rol() IN ('administradora', 'investigadora', 'formadora')
+    OR EXISTS (
+      SELECT 1 FROM public.curso_participantes cp
+      WHERE cp.id_curso = cursos.id
+        AND cp.id_participante = (SELECT auth.uid())
+        AND cp.activo
+        AND cursos.visible
+    )
   );
 
 DROP POLICY IF EXISTS "cursos_manage" ON public.cursos;
@@ -110,13 +136,18 @@ CREATE POLICY "cursos_manage" ON public.cursos
 
 DROP POLICY IF EXISTS "tareas_select" ON public.tareas_curso;
 CREATE POLICY "tareas_select" ON public.tareas_curso
-  FOR SELECT USING (
-    (
-      visible AND EXISTS (
-        SELECT 1 FROM public.cursos c
-        WHERE c.id = id_curso AND c.visible
-      )
-    ) OR public.get_my_rol() IN ('administradora', 'investigadora', 'formadora')
+  FOR SELECT TO authenticated USING (
+    public.get_my_rol() IN ('administradora', 'investigadora', 'formadora')
+    OR EXISTS (
+      SELECT 1
+      FROM public.cursos c
+      LEFT JOIN public.curso_participantes cp ON cp.id_curso = c.id
+      WHERE c.id = tareas_curso.id_curso
+        AND c.visible
+        AND tareas_curso.visible
+        AND cp.id_participante = (SELECT auth.uid())
+        AND cp.activo
+    )
   );
 
 DROP POLICY IF EXISTS "tareas_manage" ON public.tareas_curso;
@@ -129,12 +160,33 @@ CREATE POLICY "tareas_manage" ON public.tareas_curso
 
 DROP POLICY IF EXISTS "modulos_select" ON public.modulos_curso;
 CREATE POLICY "modulos_select" ON public.modulos_curso
-  FOR SELECT USING (
-    (
-      visible AND EXISTS (
-        SELECT 1 FROM public.cursos c WHERE c.id = id_curso AND c.visible
-      )
-    ) OR public.get_my_rol() IN ('administradora', 'investigadora', 'formadora')
+  FOR SELECT TO authenticated USING (
+    public.get_my_rol() IN ('administradora', 'investigadora', 'formadora')
+    OR EXISTS (
+      SELECT 1
+      FROM public.cursos c
+      LEFT JOIN public.curso_participantes cp ON cp.id_curso = c.id
+      WHERE c.id = modulos_curso.id_curso
+        AND c.visible
+        AND modulos_curso.visible
+        AND cp.id_participante = (SELECT auth.uid())
+        AND cp.activo
+    )
+  );
+
+DROP POLICY IF EXISTS "curso_participantes_select" ON public.curso_participantes;
+CREATE POLICY "curso_participantes_select" ON public.curso_participantes
+  FOR SELECT TO authenticated USING (
+    id_participante = (SELECT auth.uid())
+    OR public.get_my_rol() IN ('administradora', 'investigadora', 'formadora')
+  );
+
+DROP POLICY IF EXISTS "curso_participantes_manage" ON public.curso_participantes;
+CREATE POLICY "curso_participantes_manage" ON public.curso_participantes
+  FOR ALL TO authenticated USING (
+    public.get_my_rol() IN ('administradora', 'investigadora', 'formadora')
+  ) WITH CHECK (
+    public.get_my_rol() IN ('administradora', 'investigadora', 'formadora')
   );
 
 DROP POLICY IF EXISTS "modulos_manage" ON public.modulos_curso;
@@ -216,6 +268,6 @@ CREATE POLICY "entregas_storage_delete" ON storage.objects
     AND (storage.foldername(name))[1] = auth.uid()::TEXT
   );
 
-GRANT SELECT ON public.cursos, public.modulos_curso, public.tareas_curso, public.entregas_tarea, public.calificaciones_entrega TO authenticated;
+GRANT SELECT ON public.cursos, public.modulos_curso, public.tareas_curso, public.entregas_tarea, public.calificaciones_entrega, public.curso_participantes TO authenticated;
 GRANT INSERT, UPDATE ON public.entregas_tarea TO authenticated;
-GRANT INSERT, UPDATE, DELETE ON public.cursos, public.modulos_curso, public.tareas_curso, public.calificaciones_entrega TO authenticated;
+GRANT INSERT, UPDATE, DELETE ON public.cursos, public.modulos_curso, public.tareas_curso, public.calificaciones_entrega, public.curso_participantes TO authenticated;

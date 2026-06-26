@@ -34,10 +34,11 @@ import {
   eliminarModulo,
   eliminarTarea,
   guardarModulo,
+  guardarParticipantesCurso,
   guardarTarea,
   type CursoActionResult,
 } from "@/lib/cursos-actions"
-import type { Curso, ModuloCurso, TareaCurso } from "@/lib/cursos"
+import type { Curso, CursoParticipante, CursoUsuario, ModuloCurso, TareaCurso } from "@/lib/cursos"
 import { cn } from "@/lib/utils"
 
 function localDateTimeInput(iso: string) {
@@ -54,10 +55,14 @@ export function CourseContentManager({
   curso,
   modulos,
   tareas,
+  participantes,
+  emprendedoras,
 }: {
   curso: Curso
   modulos: ModuloCurso[]
   tareas: TareaCurso[]
+  participantes: CursoParticipante[]
+  emprendedoras: CursoUsuario[]
 }) {
   const router = useRouter()
   const [pending, startTransition] = useTransition()
@@ -73,6 +78,7 @@ export function CourseContentManager({
   const [taskTitle, setTaskTitle] = useState("")
   const [taskDescription, setTaskDescription] = useState("")
   const [taskDeadline, setTaskDeadline] = useState("")
+  const assignedIds = new Set(participantes.map((participante) => participante.id_participante))
 
   function run(action: () => Promise<CursoActionResult>, close?: () => void) {
     startTransition(async () => {
@@ -114,6 +120,10 @@ export function CourseContentManager({
           </Link>
           <h2 className="mt-3 text-2xl font-semibold text-foreground">{curso.titulo}</h2>
           <p className="mt-1 max-w-3xl text-sm text-muted-foreground">{curso.descripcion}</p>
+          <div className="mt-3 flex flex-wrap gap-2 text-sm">
+            <Badge variant="outline">Encargado: {curso.encargado?.nombre_completo ?? "Sin asignar"}</Badge>
+            <Badge variant="secondary">{participantes.length} emprendedoras asignadas</Badge>
+          </div>
         </div>
         <Button onClick={() => openModule()}>
           <Plus className="mr-1.5 h-4 w-4" />
@@ -129,6 +139,48 @@ export function CourseContentManager({
           {result.message}
         </div>
       ) : null}
+
+      <section>
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-lg">
+              <Users className="h-5 w-5 text-primary" />
+              Emprendedoras asignadas al curso
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <form action={(data) => run(() => guardarParticipantesCurso(data))} className="space-y-4">
+              <input type="hidden" name="id_curso" value={curso.id} />
+              {emprendedoras.length === 0 ? (
+                <p className="rounded-md border border-dashed p-6 text-center text-sm text-muted-foreground">
+                  No hay usuarias con rol Mujer emprendedora para asignar.
+                </p>
+              ) : (
+                <div className="grid max-h-80 gap-2 overflow-y-auto rounded-md border border-border p-3 md:grid-cols-2">
+                  {emprendedoras.map((emprendedora) => (
+                    <label key={emprendedora.id} className="flex items-start gap-2 rounded-md border border-border px-3 py-2 text-sm">
+                      <input
+                        type="checkbox"
+                        name="participantes"
+                        value={emprendedora.id}
+                        defaultChecked={assignedIds.has(emprendedora.id)}
+                        className="mt-1"
+                      />
+                      <span>
+                        <span className="block font-medium text-foreground">{emprendedora.nombre_completo ?? "Sin nombre"}</span>
+                        <span className="block text-xs text-muted-foreground">{emprendedora.email}</span>
+                      </span>
+                    </label>
+                  ))}
+                </div>
+              )}
+              <Button type="submit" disabled={pending || emprendedoras.length === 0}>
+                {pending ? "Guardando..." : "Guardar participantes"}
+              </Button>
+            </form>
+          </CardContent>
+        </Card>
+      </section>
 
       <section>
         <div className="mb-4">

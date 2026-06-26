@@ -10,9 +10,12 @@ function Progress({
   value,
   ...props
 }: ProgressPrimitive.Root.Props) {
+  const ariaValueText = typeof value === "number" ? `${value}%` : undefined
+
   return (
     <ProgressPrimitive.Root
       value={value}
+      aria-valuetext={ariaValueText}
       data-slot="progress"
       className={cn("flex flex-wrap gap-3", className)}
       {...props}

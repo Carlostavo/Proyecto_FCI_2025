@@ -50,16 +50,28 @@ const SECCIONES = [
   { value: "roles", label: "Roles y permisos", icon: ShieldCheck },
   { value: "indicadores", label: "Parámetros de indicadores", icon: Gauge },
   { value: "periodos", label: "Periodos de evaluación", icon: CalendarRange },
+  { value: "historial", label: "Historial de ingresos", icon: Check },
 ] as const
 
 export function ConfiguracionTabs({ 
   usuarios = [], 
   esAdmin = false,
   projectInfo,
+  historialIngresos = [],
 }: { 
   usuarios?: Array<{ id: string; nombre_completo: string | null; email: string | null; rol: string; activa: boolean }> 
   esAdmin?: boolean
   projectInfo: ProjectInfo
+  historialIngresos?: Array<{
+    id: string
+    id_usuario: string
+    nombre_usuario: string | null
+    email_usuario: string | null
+    rol_usuario: string | null
+    fecha_ingreso: string
+    ruta: string | null
+    user_agent: string | null
+  }>
 }) {
   return (
     <Tabs defaultValue="proyecto" className="gap-6">
@@ -85,11 +97,14 @@ export function ConfiguracionTabs({
       <TabsContent value="roles">
         <RolesPermisos />
       </TabsContent>
-      <TabsContent value="indicadores">
-        <ParametrosIndicadores />
-      </TabsContent>
       <TabsContent value="periodos">
         <PeriodosEvaluacion />
+      </TabsContent>
+      <TabsContent value="historial">
+        <HistorialIngresos historialIngresos={historialIngresos} />
+      </TabsContent>
+      <TabsContent value="indicadores">
+        <ParametrosIndicadores />
       </TabsContent>
     </Tabs>
   )
@@ -580,6 +595,53 @@ function RolesPermisos() {
                 ))}
               </TableRow>
             ))}
+          </TableBody>
+        </Table>
+      </div>
+    </Panel>
+  )
+}
+
+function HistorialIngresos({ historialIngresos }: { historialIngresos: Array<{
+  id: string
+  id_usuario: string
+  nombre_usuario: string | null
+  email_usuario: string | null
+  rol_usuario: string | null
+  fecha_ingreso: string
+  ruta: string | null
+  user_agent: string | null
+}> }) {
+  return (
+    <Panel title="Historial de ingresos" description="Últimos accesos registrados al iniciar sesión">
+      <div className="overflow-x-auto rounded-md border border-border">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Usuario</TableHead>
+              <TableHead>Correo</TableHead>
+              <TableHead>Rol</TableHead>
+              <TableHead>Fecha</TableHead>
+              <TableHead>Ruta</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {historialIngresos.map((item) => (
+              <TableRow key={item.id}>
+                <TableCell className="font-medium">{item.nombre_usuario ?? "—"}</TableCell>
+                <TableCell>{item.email_usuario ?? "—"}</TableCell>
+                <TableCell>{item.rol_usuario ?? "—"}</TableCell>
+                <TableCell>{new Date(item.fecha_ingreso).toLocaleString("es-EC")}</TableCell>
+                <TableCell>{item.ruta ?? "—"}</TableCell>
+              </TableRow>
+            ))}
+            {historialIngresos.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={5} className="py-8 text-center text-muted-foreground">
+                  Aún no hay ingresos registrados.
+                </TableCell>
+              </TableRow>
+            ) : null}
           </TableBody>
         </Table>
       </div>

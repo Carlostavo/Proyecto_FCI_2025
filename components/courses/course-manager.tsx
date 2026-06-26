@@ -23,10 +23,10 @@ import {
   guardarCurso,
   type CursoActionResult,
 } from "@/lib/cursos-actions"
-import type { Curso } from "@/lib/cursos"
+import type { Curso, CursoUsuario } from "@/lib/cursos"
 import { cn } from "@/lib/utils"
 
-export function CourseManager({ cursos }: { cursos: Curso[] }) {
+export function CourseManager({ cursos, encargados }: { cursos: Curso[]; encargados: CursoUsuario[] }) {
   const router = useRouter()
   const [pending, startTransition] = useTransition()
   const [open, setOpen] = useState(false)
@@ -35,6 +35,7 @@ export function CourseManager({ cursos }: { cursos: Curso[] }) {
   const [courseTitle, setCourseTitle] = useState("")
   const [courseDescription, setCourseDescription] = useState("")
   const [courseStatus, setCourseStatus] = useState<Curso["estado"]>("en_diseno")
+  const [courseManagerId, setCourseManagerId] = useState("")
 
   function run(action: () => Promise<CursoActionResult>, close = false) {
     startTransition(async () => {
@@ -52,6 +53,7 @@ export function CourseManager({ cursos }: { cursos: Curso[] }) {
     setCourseTitle(course?.titulo ?? "")
     setCourseDescription(course?.descripcion ?? "")
     setCourseStatus(course?.estado ?? "en_diseno")
+    setCourseManagerId(course?.id_encargado ?? "")
     setResult(null)
     setOpen(true)
   }
@@ -98,7 +100,7 @@ export function CourseManager({ cursos }: { cursos: Curso[] }) {
                       {curso.visible ? "Publicado" : "Oculto"}
                     </Badge>
                     <Badge variant="outline" className="ml-2 mt-2">
-                      {{ borrador: "Borrador", en_diseno: "En diseno", en_validacion: "En validacion", completado: "Completado" }[curso.estado]}
+                      {{ borrador: "Borrador", en_diseno: "En diseño", en_validacion: "En validación", completado: "Completado" }[curso.estado]}
                     </Badge>
                   </div>
                   <div className="flex shrink-0 gap-1">
@@ -137,6 +139,10 @@ export function CourseManager({ cursos }: { cursos: Curso[] }) {
               </CardHeader>
               <CardContent className="flex flex-1 flex-col">
                 <p className="flex-1 text-sm leading-6 text-muted-foreground">{curso.descripcion}</p>
+                <div className="mt-4 grid gap-2 rounded-md bg-muted/40 p-3 text-sm">
+                  <p><span className="font-medium text-foreground">Encargado:</span> {curso.encargado?.nombre_completo ?? "Sin asignar"}</p>
+                  <p><span className="font-medium text-foreground">Emprendedoras:</span> {curso.participantes_count ?? 0} asignadas</p>
+                </div>
                 <Link href={`/diseno-cursos/${curso.id}`} className={buttonVariants({ className: "mt-5 w-full" })}>
                   <FilePenLine className="mr-1.5 h-4 w-4" />
                   Editar contenido
@@ -152,7 +158,7 @@ export function CourseManager({ cursos }: { cursos: Curso[] }) {
           <DialogHeader>
             <DialogTitle>{editing ? "Editar curso" : "Crear curso"}</DialogTitle>
             <DialogDescription>
-              Despues podras crear los modulos, textos y tareas dentro del curso.
+              Después podrás crear los módulos, textos, tareas y asignar emprendedoras dentro del curso.
             </DialogDescription>
           </DialogHeader>
           <form
@@ -162,12 +168,28 @@ export function CourseManager({ cursos }: { cursos: Curso[] }) {
           >
             <input type="hidden" name="id" value={editing?.id ?? ""} />
             <label className="block space-y-1.5 text-sm font-medium">
-              <span>Titulo</span>
+              <span>Título</span>
               <Input name="titulo" value={courseTitle} onChange={(event) => setCourseTitle(event.target.value)} required />
             </label>
             <label className="block space-y-1.5 text-sm font-medium">
-              <span>Descripcion</span>
+              <span>Descripción</span>
               <Textarea name="descripcion" value={courseDescription} onChange={(event) => setCourseDescription(event.target.value)} required />
+            </label>
+            <label className="block space-y-1.5 text-sm font-medium">
+              <span>Encargado del curso</span>
+              <select
+                name="id_encargado"
+                value={courseManagerId}
+                onChange={(event) => setCourseManagerId(event.target.value)}
+                className="h-8 w-full rounded-lg border border-input bg-background px-2.5 text-sm outline-none focus:border-ring focus:ring-3 focus:ring-ring/50"
+              >
+                <option value="">Sin asignar</option>
+                {encargados.map((encargado) => (
+                  <option key={encargado.id} value={encargado.id}>
+                    {encargado.nombre_completo ?? encargado.email ?? "Usuario"} · {encargado.rol}
+                  </option>
+                ))}
+              </select>
             </label>
             <label className="block space-y-1.5 text-sm font-medium">
               <span>Estado del curso</span>
@@ -178,8 +200,8 @@ export function CourseManager({ cursos }: { cursos: Curso[] }) {
                 className="h-8 w-full rounded-lg border border-input bg-background px-2.5 text-sm outline-none focus:border-ring focus:ring-3 focus:ring-ring/50"
               >
                 <option value="borrador">Borrador</option>
-                <option value="en_diseno">En diseno</option>
-                <option value="en_validacion">En validacion</option>
+                <option value="en_diseno">En diseño</option>
+                <option value="en_validacion">En validación</option>
                 <option value="completado">Completado</option>
               </select>
             </label>

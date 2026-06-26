@@ -8,6 +8,7 @@ export type ScientificProduct = {
   tipo: "articulo_scopus" | "articulo_latindex" | "ponencia" | "capitulo_libro" | "politica_publica"
   estado: "pendiente" | "en_redaccion" | "en_revision" | "publicado"
   evidencia_url: string | null
+  fecha_objetivo: string | null
   investigadores: Investigator[]
 }
 
@@ -16,7 +17,7 @@ export async function getInvestigators(): Promise<Investigator[]> {
   const { data, error } = await supabase
     .from("v_perfiles_usuario_con_rol")
     .select("id, nombre_completo, email, rol")
-    .in("rol", ["investigadora", "administradora"])
+    .in("rol", ["administradora", "investigadora", "formadora", "institucion_aliada"])
     .order("nombre_completo")
   if (error || !data) return []
   return data.map((item) => ({ id: item.id, nombre: item.nombre_completo || item.email || "Sin nombre", email: item.email }))
@@ -26,7 +27,7 @@ export async function getScientificProducts(): Promise<ScientificProduct[]> {
   const supabase = await createClient()
   const { data, error } = await supabase
     .from("productos_cientificos")
-    .select("id, titulo, descripcion, tipo, estado, evidencia_url, enlace")
+    .select("id, titulo, descripcion, tipo, estado, evidencia_url, enlace, fecha_objetivo")
     .order("fecha_actualizacion", { ascending: false })
   if (error || !data) return []
 
@@ -51,6 +52,7 @@ export async function getScientificProducts(): Promise<ScientificProduct[]> {
     tipo: item.tipo as ScientificProduct["tipo"],
     estado: item.estado as ScientificProduct["estado"],
     evidencia_url: item.evidencia_url || item.enlace,
+    fecha_objetivo: item.fecha_objetivo ?? null,
     investigadores: (assignments ?? [])
       .filter((assignment) => assignment.id_producto === item.id)
       .map((assignment) => profileMap.get(assignment.id_investigador))
@@ -77,5 +79,6 @@ export async function getProductionDashboardData() {
       cumplimiento: products.length ? Math.round((completados / products.length) * 100) : 0,
     },
     investigadores: [...map.values()],
+    productos: products,
   }
 }

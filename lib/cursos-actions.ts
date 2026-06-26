@@ -47,18 +47,20 @@ export async function guardarCurso(formData: FormData): Promise<CursoActionResul
   const titulo = capitalizarPrimera(texto(formData, "titulo"))
   const descripcion = capitalizarPrimera(texto(formData, "descripcion"))
   const estado = texto(formData, "estado") || "en_diseno"
+  const idEncargado = texto(formData, "id_encargado") || null
 
   if (!titulo || !descripcion) {
-    return { ok: false, message: "Completa titulo y descripcion." }
+    return { ok: false, message: "Completa título y descripción." }
   }
   if (!["borrador", "en_diseno", "en_validacion", "completado"].includes(estado)) {
-    return { ok: false, message: "Selecciona un estado valido para el curso." }
+    return { ok: false, message: "Selecciona un estado válido para el curso." }
   }
 
   const payload = {
     titulo,
     descripcion,
     estado,
+    id_encargado: idEncargado,
     fecha_actualizacion: new Date().toISOString(),
   }
 
@@ -70,6 +72,54 @@ export async function guardarCurso(formData: FormData): Promise<CursoActionResul
   if (error) return { ok: false, message: `No se pudo guardar el curso: ${error.message}` }
   revalidarCursos()
   return { ok: true, message: id ? "Curso actualizado." : "Curso creado." }
+}
+
+export async function guardarParticipantesCurso(formData: FormData): Promise<CursoActionResult> {
+  const ctx = await contextoGestion()
+  if (ctx.error || !ctx.user) return { ok: false, message: ctx.error ?? "No autorizado." }
+
+  const idCurso = texto(formData, "id_curso")
+  const participantes = formData.getAll("participantes").map((value) => String(value))
+  if (!idCurso) return { ok: false, message: "Selecciona un curso." }
+
+  const { data: current, error: currentError } = await ctx.supabase
+    .from("curso_participantes")
+    .select("id_participante")
+    .eq("id_curso", idCurso)
+    .eq("activo", true)
+
+  if (currentError) return { ok: false, message: `No se pudieron leer las asignaciones: ${currentError.message}` }
+
+  const actuales = new Set((current ?? []).map((item) => item.id_participante as string))
+  const seleccionados = new Set(participantes)
+  const remover = [...actuales].filter((id) => !seleccionados.has(id))
+  const agregar = [...seleccionados].filter((id) => !actuales.has(id))
+
+  if (remover.length) {
+    const { error } = await ctx.supabase
+      .from("curso_participantes")
+      .update({ activo: false })
+      .eq("id_curso", idCurso)
+      .in("id_participante", remover)
+    if (error) return { ok: false, message: `No se pudieron quitar participantes: ${error.message}` }
+  }
+
+  if (agregar.length) {
+    const { error } = await ctx.supabase
+      .from("curso_participantes")
+      .upsert(agregar.map((idParticipante) => ({
+        id_curso: idCurso,
+        id_participante: idParticipante,
+        asignado_por: ctx.user.id,
+        activo: true,
+        fecha_asignacion: new Date().toISOString(),
+      })), { onConflict: "id_curso,id_participante" })
+    if (error) return { ok: false, message: `No se pudieron asignar participantes: ${error.message}` }
+  }
+
+  revalidarCursos()
+  revalidatePath(`/diseno-cursos/${idCurso}`)
+  return { ok: true, message: "Participantes del curso actualizadas." }
 }
 
 export async function cambiarVisibilidadCurso(id: string, visible: boolean): Promise<CursoActionResult> {

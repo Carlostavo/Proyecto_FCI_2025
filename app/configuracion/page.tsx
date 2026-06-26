@@ -4,11 +4,13 @@ import { obtenerUsuarios } from "@/lib/usuarios-actions"
 import { getRolActual } from "@/lib/perfil"
 import { getProjectInfo } from "@/lib/project-info"
 import { ConfiguracionClientWrapper } from "@/components/configuracion/configuracion-client-wrapper"
+import { obtenerHistorialIngresos } from "@/lib/permisos"
 
 export default async function ConfiguracionPage() {
   const usuarios = await obtenerUsuarios()
   const rolActual = await getRolActual()
   const projectInfo = await getProjectInfo()
+  const historialIngresos = await obtenerHistorialIngresos(12)
 
   return (
     <AppShell>
@@ -28,6 +30,7 @@ export default async function ConfiguracionPage() {
           }))}
           initialRol={rolActual}
           projectInfo={projectInfo}
+          historialIngresos={historialIngresos}
         />
       </div>
     </AppShell>

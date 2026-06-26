@@ -299,6 +299,21 @@ export async function getProjectDashboardData(): Promise<ProjectDashboardData> {
     cursos: courseStats,
     produccion: production.resumen,
     produccionPorInvestigador: production.investigadores,
+    actividades: [
+      ...((production.productos ?? []).map((product: {
+        titulo: string
+        fecha_objetivo: string | null
+        estado: string
+      }) => ({
+        titulo: product.titulo,
+        fecha: product.fecha_objetivo
+          ? new Date(`${product.fecha_objetivo}T00:00:00`).toLocaleDateString("es-EC")
+          : "Sin fecha",
+        estado: product.estado === "publicado" ? "Publicado" : "Programado",
+        color: product.estado === "publicado" ? "bg-emerald-500" : "bg-blue-500",
+      }))),
+      ...dashboard.actividades,
+    ].slice(0, 8),
     validacion: {
       encuestadas: csvCount,
       meta: csvCount,

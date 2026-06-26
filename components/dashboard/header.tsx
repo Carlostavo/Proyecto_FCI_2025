@@ -161,10 +161,12 @@ export function Toolbar({
   titulo = "Dashboard",
   descripcion = "Resumen general del proyecto",
   showControls = true,
+  action,
 }: {
   titulo?: string
   descripcion?: string
   showControls?: boolean
+  action?: React.ReactNode
 }) {
   return (
     <div className="flex flex-col gap-3 px-6 py-5 sm:flex-row sm:items-center sm:justify-between">
@@ -172,18 +174,21 @@ export function Toolbar({
         <h2 className="text-2xl font-semibold text-foreground">{titulo}</h2>
         <p className="text-sm text-muted-foreground">{descripcion}</p>
       </div>
-      {showControls && (
-        <div className="flex items-center gap-3">
+      <div className="flex items-center gap-3">
+        {showControls && (
           <div className="flex items-center gap-2 rounded-md border border-border bg-card px-3 py-2 text-sm text-foreground">
             <CalendarDays className="h-4 w-4 text-muted-foreground" />
             <span>01/08/2025 - 30/10/2025</span>
           </div>
+        )}
+        {action}
+        {showControls && !action && (
           <button className="flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-opacity hover:opacity-90">
             <Download className="h-4 w-4" />
             Exportar reporte
           </button>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   )
 }

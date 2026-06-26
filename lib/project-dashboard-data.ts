@@ -89,12 +89,12 @@ export const fallbackProjectDashboardData: ProjectDashboardData = {
     { necesidad: "Uso de tecnología", valor: 62 },
     { necesidad: "Educación financiera", valor: 47 },
     { necesidad: "Formalización", valor: 24 },
-    { necesidad: "Gestion de costos", valor: 17 },
+    { necesidad: "Gestión de costos", valor: 17 },
   ],
   competencias: [
     { competencia: "Digital", valor: 9 },
     { competencia: "Comercial", valor: 15 },
-    { competencia: "Gestion", valor: 54 },
+    { competencia: "Gestión", valor: 54 },
     { competencia: "Innovación", valor: 6 },
     { competencia: "Financiera", valor: 29 },
   ],
@@ -112,13 +112,13 @@ export const fallbackProjectDashboardData: ProjectDashboardData = {
     ],
     sectores: [
       { nombre: "Comercio", valor: 502 },
-      { nombre: "Alimentacion", valor: 296 },
-      { nombre: "Artesanias", valor: 54 },
+      { nombre: "Alimentación", valor: 296 },
+      { nombre: "Artesanías", valor: 54 },
       { nombre: "Textiles", valor: 49 },
       { nombre: "Servicios", valor: 35 },
     ],
     etnias: [
-      { nombre: "Indigena", valor: 715 },
+      { nombre: "Indígena", valor: 715 },
       { nombre: "Mestiza", valor: 209 },
       { nombre: "Montubia", valor: 26 },
       { nombre: "Blanca", valor: 12 },
@@ -127,7 +127,7 @@ export const fallbackProjectDashboardData: ProjectDashboardData = {
     modalidades: [
       { nombre: "Virtual", valor: 164 },
       { nombre: "Presencial", valor: 36 },
-      { nombre: "Hibrida", valor: 19 },
+      { nombre: "Híbrida", valor: 19 },
     ],
   },
   actividades: [
